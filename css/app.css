@@ -188,8 +188,10 @@ textarea.input { min-height: 120px; resize: vertical; line-height: 1.6; }
 .photos .add span { font-size: 28px; display: block; text-align: center; }
 .photos .add:active { background: var(--gold-soft); }
 
-.submit-wrap { position: sticky; bottom: calc(10px + var(--safe-b)); z-index: 4; padding-top: 10px; background: linear-gradient(rgba(247,243,234,0), var(--bg) 40%); }
-body.has-status .submit-wrap { bottom: calc(52px + var(--safe-b)); }
+.submit-wrap { margin-top: 18px; }
+.photo-alt { text-align: center; margin: 4px 0 0; }
+.photo-alt a { font-size: 14px; font-weight: 700; }
+.photos .add { min-height: 96px; }
 
 /* ---------- 상태줄, 토스트, 모달 ---------- */
 .statusbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; padding: 10px 16px calc(10px + var(--safe-b)); font-size: 13px; font-weight: 700; text-align: center; background: var(--bg-deep); color: #fff; box-shadow: 0 -4px 14px rgba(0,0,0,.12); }

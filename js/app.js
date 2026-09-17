@@ -379,10 +379,12 @@ function viewMission(placeId, missionId) {
   if (m.type === "photo") {
     const max = m.maxPhotos || 1;
     photoGrid = el("div", { class: "photos" });
+    // 카메라로 바로 찍기 / 앨범에서 고르기 두 가지 입력
     const fileInput = el("input", { type: "file", accept: "image/*", capture: "environment", class: "sr-only" });
-    fileInput.addEventListener("change", async () => {
-      const f = fileInput.files && fileInput.files[0];
-      fileInput.value = "";
+    const galleryInput = el("input", { type: "file", accept: "image/*", class: "sr-only" });
+    const onPick = (input) => async () => {
+      const f = input.files && input.files[0];
+      input.value = "";
       if (!f) return;
       if (draft.photos.length >= max) return;
       const busy = el("div", { class: "ph" }, el("div", { style: "display:grid;place-items:center;height:100%" }, el("span", { class: "spinner" })));
@@ -391,11 +393,14 @@ function viewMission(placeId, missionId) {
         const blob = await compressImage(f, CFG.photo || {});
         draft.photos.push(blob);
       } catch (e) {
-        toast("사진을 읽지 못했어요. 다시 찍어 주세요.", "error");
+        console.error(e);
+        toast("사진을 읽지 못했어요. 다른 사진으로 다시 시도해 주세요.", "error");
       }
       renderPhotos();
-    });
-    body.append(fileInput);
+    };
+    fileInput.addEventListener("change", onPick(fileInput));
+    galleryInput.addEventListener("change", onPick(galleryInput));
+    body.append(fileInput, galleryInput);
     const renderPhotos = () => {
       photoGrid.innerHTML = "";
       draft.photos.forEach((blob, i) => {
@@ -409,7 +414,11 @@ function viewMission(placeId, missionId) {
       }
     };
     renderPhotos();
-    body.append(el("div", { class: "field" }, [el("label", {}, `사진 (최대 ${max}장)`), photoGrid]));
+    body.append(el("div", { class: "field" }, [
+      el("label", {}, `사진 (최대 ${max}장)`),
+      photoGrid,
+      el("p", { class: "photo-alt" }, el("a", { href: "#", onclick: (e) => { e.preventDefault(); if (draft.photos.length < max) galleryInput.click(); } }, "이미 찍은 사진을 앨범에서 고르기")),
+    ]));
     // 이미 제출한 사진 미리보기
     if (prev && prev.photoCount) {
       const prevGrid = el("div", { class: "photos" });
