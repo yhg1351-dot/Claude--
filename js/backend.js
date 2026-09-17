@@ -83,7 +83,8 @@ function makeSupabase() {
       const { data } = await client.auth.getSession();
       return !!(data && data.session);
     },
-    teacherLogout: () => client.auth.signOut(),
+    // 이 기기만 로그아웃 (기본값 global 은 같은 계정의 다른 교사 기기까지 모두 로그아웃시킴)
+    teacherLogout: () => client.auth.signOut({ scope: "local" }),
     async fetchAll() {
       try {
         const [subs, sess] = await Promise.all([
