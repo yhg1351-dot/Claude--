@@ -178,11 +178,48 @@ function route() {
   return { name: "home" };
 }
 function go(hash) { location.hash = hash; }
+function rememberRoute() {
+  const h = location.hash;
+  if (/^#\/(place|mission)\//.test(h)) ls.set("mq-last-route", { hash: h, at: Date.now() });
+  else if (h === "#/" || h === "") ls.remove("mq-last-route");
+}
+// 카메라 앱 등에서 돌아오며 페이지가 주소만 남기고 새로 열렸을 때, 30분 안에 보던 화면으로 되돌린다
+function restoreRoute() {
+  if (location.hash && location.hash !== "#/") return;
+  const last = ls.get("mq-last-route");
+  if (last && last.hash && Date.now() - last.at < 30 * 60 * 1000) history.replaceState(null, "", last.hash);
+}
+
+// 카카오톡·네이버·인스타그램 등 앱 안의 브라우저인지 (카메라·저장 기능이 불안정함)
+function inAppBrowser() {
+  const ua = navigator.userAgent || "";
+  if (/KAKAOTALK/i.test(ua)) return "kakao";
+  if (/NAVER\(inapp|; wv\)|Instagram|FBAN|FBAV|Line\//i.test(ua)) return "other";
+  return null;
+}
+function inAppNotice() {
+  const kind = inAppBrowser();
+  if (!kind) return null;
+  const url = location.href.split("#")[0];
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  const box = el("div", { class: "notice warn", style: "margin:8px 0 4px" }, [
+    el("div", {}, [el("strong", {}, "앱 안의 브라우저로 열렸어요."), " 사진 찍기가 잘 안 될 수 있으니 크롬이나 사파리로 열어 주세요."]),
+  ]);
+  if (kind === "kakao") {
+    box.append(el("button", { class: "btn small", style: "margin-top:8px", onclick: () => { location.href = `kakaotalk://web/openExternal?url=${encodeURIComponent(url)}`; } }, "기본 브라우저로 열기"));
+  } else if (isAndroid) {
+    box.append(el("button", { class: "btn small", style: "margin-top:8px", onclick: () => { location.href = `intent://${url.replace(/^https?:\/\//, "")}#Intent;scheme=https;package=com.android.chrome;end`; } }, "크롬으로 열기"));
+  } else {
+    box.append(el("div", { class: "small", style: "margin-top:6px" }, "오른쪽 위 메뉴에서 'Safari로 열기' 또는 '다른 브라우저로 열기'를 눌러 주세요."));
+  }
+  return box;
+}
 
 // ------------------------------------------------------------ 렌더링
 const root = () => $("#app");
 
 function render() {
+  rememberRoute();
   const r = route();
   const app = root();
   app.innerHTML = "";
@@ -210,6 +247,7 @@ function viewLogin() {
   ]);
   hero.append(heroSkyline());
   wrap.append(hero);
+  wrap.append(inAppNotice());
   const msg = state.loginMessage;
   const input = el("input", { class: "input code-input", inputmode: "numeric", pattern: "[0-9]*", maxlength: "4", placeholder: "6101", autocomplete: "off" });
   const err = el("div", { class: "notice error hidden" });
@@ -273,6 +311,7 @@ function viewHome() {
   const wrap = el("div");
   const tp = totalProgress();
   wrap.append(el("div", { class: "topbar" }, el("h1", {}, state.data.trip.title)));
+  wrap.append(inAppNotice());
   wrap.append(el("div", { class: "home-head" }, [
     el("div", { class: "who" }, [
       el("div", { class: "g" }, `${state.session.code[0]}학년 ${state.session.code[1]}반`),
@@ -557,7 +596,7 @@ async function init() {
     return;
   }
   state.session = ls.get("mq-session");
-  if (state.session) { loadProgress(); await loadDrafts(); }
+  if (state.session) { loadProgress(); await loadDrafts(); restoreRoute(); }
 
   onSync(async (ev) => {
     if (ev.type === "uploading") syncMsg = `📤 사진 전송 중 (${ev.index + 1}/${ev.total})`;
