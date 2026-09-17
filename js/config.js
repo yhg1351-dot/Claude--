@@ -16,7 +16,7 @@ window.APP_CONFIG = {
 
   // 교사 로그인용 이메일. 여기에 넣어 두면 교사 화면에서 "교사 코드"(그 계정의 비밀번호)만 입력하면 됩니다.
   // 비워 두면 이메일과 비밀번호를 모두 입력하는 화면이 나옵니다.
-  teacherEmail: "",
+  teacherEmail: "yhg1351@gmail.com",
 
   // 데모 모드에서 교사 화면 비밀번호 (Supabase 연결 후에는 사용되지 않음)
   localTeacherPassword: "1234",
