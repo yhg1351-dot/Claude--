@@ -31,7 +31,7 @@ GitHub 웹에서 파일을 열어 연필 아이콘으로 수정하고 저장(Com
 ## 2. GitHub Pages로 배포
 
 1. 저장소 **Settings → Pages → Build and deployment → Source**를 **GitHub Actions**로 선택합니다.
-2. `main` 브랜치에 푸시(또는 병합)하면 `.github/workflows/pages.yml`이 자동으로 배포합니다.
+2. 기본 브랜치에 푸시하면 `.github/workflows/pages.yml`이 자동으로 배포합니다. (처음 실행 시 Pages를 자동으로 켜려고 시도합니다)
 3. 주소는 `https://<계정>.github.io/<저장소 이름>/` 입니다. QR 코드로 만들어 학생에게 나눠 주세요.
 4. 저장소가 비공개(private)면 무료 계정에서는 Pages를 쓸 수 없습니다. 공개 저장소여도 학생 데이터는 저장소에 저장되지 않습니다.
 

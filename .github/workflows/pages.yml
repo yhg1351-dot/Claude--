@@ -1,9 +1,10 @@
-# GitHub Pages 자동 배포: main 브랜치에 푸시하면 사이트가 갱신됩니다.
-# 저장소 Settings > Pages > Source 를 "GitHub Actions"로 선택해 두세요.
+# GitHub Pages 자동 배포: 아래 브랜치에 푸시하면 사이트가 갱신됩니다.
+# 처음 한 번은 Pages를 자동으로 켜려고 시도하며, 실패하면
+# 저장소 Settings > Pages > Source 를 "GitHub Actions"로 선택한 뒤 다시 실행하세요.
 name: Deploy to GitHub Pages
 on:
   push:
-    branches: [main]
+    branches: [main, claude/stoic-allen-p5nu52]
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,6 +22,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
