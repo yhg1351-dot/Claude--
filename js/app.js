@@ -158,11 +158,16 @@ async function pullProgress() {
   const r = await backend.getProgress(state.session.token);
   if (!r.ok || !Array.isArray(r.submissions)) return;
   const queued = new Set((await pending()).map((i) => i.missionId));
+  const onServer = new Set(r.submissions.map((s) => s.mission_id));
   for (const s of r.submissions) {
     if (queued.has(s.mission_id)) continue; // 아직 보내지 않은 새 제출이 우선
     state.progress[s.mission_id] = {
       status: "sent", answer: s.answer, photoCount: (s.photo_paths || []).length, at: s.updated_at || s.created_at,
     };
+  }
+  // 서버에서 지워진 제출(교사 전체 삭제 등)은 폰 화면에서도 '완료' 표시를 내린다
+  for (const mid of Object.keys(state.progress)) {
+    if (state.progress[mid].status === "sent" && !onServer.has(mid) && !queued.has(mid)) delete state.progress[mid];
   }
   saveProgress();
   render();
