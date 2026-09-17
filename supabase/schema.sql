@@ -205,10 +205,9 @@ create or replace function public.is_group_active(p_code text)
 returns boolean
 language sql security definer stable set search_path = public
 as $$
-  select exists (
-    select 1 from public.group_sessions gs
-    where gs.code = p_code and gs.last_seen > now() - interval '30 minutes'
-  )
+  -- 한 번이라도 접속한 적이 있는 모둠이면 사진 업로드를 허용한다.
+  -- (신호가 잠시 끊겨도 밀린 사진을 계속 올릴 수 있도록 시간 제한을 두지 않음)
+  select exists (select 1 from public.group_sessions gs where gs.code = p_code)
 $$;
 revoke all on function public.is_group_active(text) from public;
 grant execute on function public.is_group_active(text) to anon, authenticated;
