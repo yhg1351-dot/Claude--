@@ -247,7 +247,7 @@ function viewLogin() {
   ]);
   hero.append(heroSkyline());
   wrap.append(hero);
-  wrap.append(inAppNotice());
+  { const n = inAppNotice(); if (n) wrap.append(n); }
   const msg = state.loginMessage;
   const input = el("input", { class: "input code-input", inputmode: "numeric", pattern: "[0-9]*", maxlength: "4", placeholder: "6101", autocomplete: "off" });
   const err = el("div", { class: "notice error hidden" });
@@ -311,7 +311,7 @@ function viewHome() {
   const wrap = el("div");
   const tp = totalProgress();
   wrap.append(el("div", { class: "topbar" }, el("h1", {}, state.data.trip.title)));
-  wrap.append(inAppNotice());
+  { const n = inAppNotice(); if (n) wrap.append(n); }
   wrap.append(el("div", { class: "home-head" }, [
     el("div", { class: "who" }, [
       el("div", { class: "g" }, `${state.session.code[0]}학년 ${state.session.code[1]}반`),
