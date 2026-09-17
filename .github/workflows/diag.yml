@@ -1,0 +1,13 @@
+# Supabase 연결 점검 (수동 실행). Actions 탭에서 Run workflow 를 누르면 로그에 결과가 나온다.
+name: Supabase diagnostics
+on:
+  workflow_dispatch:
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/diag.mjs
