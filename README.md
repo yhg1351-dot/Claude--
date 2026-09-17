@@ -43,6 +43,7 @@ Supabase 값을 넣기 전까지 앱은 **데모 모드**로 동작합니다. �
 1. [supabase.com](https://supabase.com)에서 무료 프로젝트를 만듭니다. (Region: Northeast Asia (Seoul) 권장)
 2. **SQL Editor**에 `supabase/schema.sql` 내용을 전부 붙여넣고 **Run** 합니다. (여러 번 실행해도 안전)
 3. **Authentication → Users → Add user**로 교사 계정(이메일/비밀번호)을 만듭니다. "Auto Confirm User"를 켭니다. 교사 19명이 공용 계정 하나를 써도 되고 각자 만들어도 됩니다.
+   - 그 이메일을 `js/config.js`의 `teacherEmail`에 넣으면 교사 화면에서 비밀번호("교사 코드")만 입력하면 됩니다. 비밀번호는 6자 이상이어야 하며, Authentication → Users에서 언제든 바꿀 수 있습니다.
 4. **Project Settings → API**에서 `Project URL`과 `anon public` 키를 복사해 `js/config.js`에 넣습니다.
    ```js
    supabaseUrl: "https://xxxx.supabase.co",

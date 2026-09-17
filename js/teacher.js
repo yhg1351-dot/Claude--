@@ -108,25 +108,35 @@ function render() {
 }
 
 function viewLogin() {
+  const fixedEmail = (CFG.teacherEmail || "").trim();
+  const simple = isConfigured && !!fixedEmail && !state.useEmailLogin;
   const email = el("input", { class: "input", type: "email", placeholder: "교사 이메일", autocomplete: "username" });
-  const pw = el("input", { class: "input", type: "password", placeholder: "비밀번호", autocomplete: "current-password" });
+  const pw = el("input", { class: "input", type: "password", placeholder: simple ? "교사 코드" : "비밀번호", autocomplete: "current-password", inputmode: simple ? "text" : null });
   const err = el("div", { class: "notice error hidden" });
-  const btn = el("button", { class: "btn primary" }, "로그인");
+  const btn = el("button", { class: "btn primary" }, "들어가기");
   const doLogin = async () => {
     btn.disabled = true;
-    const r = await backend.teacherLogin(email.value.trim(), pw.value);
+    const r = await backend.teacherLogin(simple ? fixedEmail : email.value.trim(), pw.value);
     btn.disabled = false;
     if (r.ok) { state.loggedIn = true; render(); load(); startAutoRefresh(); }
-    else { err.textContent = r.reason === "auth" ? "이메일 또는 비밀번호가 맞지 않습니다." : `로그인 실패: ${r.message || ""}`; err.classList.remove("hidden"); }
+    else {
+      err.textContent = r.reason === "auth" ? (simple ? "교사 코드가 맞지 않습니다." : "이메일 또는 비밀번호가 맞지 않습니다.") : `로그인 실패: ${r.message || ""}`;
+      err.classList.remove("hidden");
+    }
   };
   btn.addEventListener("click", doLogin);
   pw.addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
   return el("div", { style: "max-width:420px;margin:40px auto" }, el("div", { class: "card" }, [
     el("h2", {}, "교사 확인 화면"),
     el("p", { class: "muted" }, state.data.trip.title),
-    isConfigured ? el("div", { class: "field" }, email) : el("div", { class: "notice info small" }, "데모 모드: 이 기기에서 제출한 내용만 보입니다. 비밀번호는 config.js의 localTeacherPassword 값입니다."),
-    el("div", { class: "field" }, pw),
+    !isConfigured ? el("div", { class: "notice info small" }, "데모 모드: 이 기기에서 제출한 내용만 보입니다. 비밀번호는 config.js의 localTeacherPassword 값입니다.") : null,
+    isConfigured && !simple ? el("div", { class: "field" }, email) : null,
+    el("div", { class: "field" }, [simple ? el("label", {}, "교사 코드를 입력하세요") : null, pw]),
     err, btn,
+    isConfigured && fixedEmail
+      ? el("p", { class: "muted small", style: "margin-top:12px;text-align:center" }, el("a", { href: "#", onclick: (e) => { e.preventDefault(); state.useEmailLogin = !state.useEmailLogin; render(); } }, simple ? "다른 계정으로 로그인" : "교사 코드로 로그인"))
+      : null,
+    el("p", { class: "muted small", style: "text-align:center" }, "한 번 로그인하면 이 기기에서는 계속 유지됩니다."),
   ]));
 }
 

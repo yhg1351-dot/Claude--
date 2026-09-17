@@ -14,6 +14,10 @@ window.APP_CONFIG = {
   // 사진 압축 설정 (긴 변 픽셀, JPEG 품질, 목표 최대 용량)
   photo: { maxSide: 1280, quality: 0.8, maxBytes: 250 * 1024 },
 
+  // 교사 로그인용 이메일. 여기에 넣어 두면 교사 화면에서 "교사 코드"(그 계정의 비밀번호)만 입력하면 됩니다.
+  // 비워 두면 이메일과 비밀번호를 모두 입력하는 화면이 나옵니다.
+  teacherEmail: "",
+
   // 데모 모드에서 교사 화면 비밀번호 (Supabase 연결 후에는 사용되지 않음)
   localTeacherPassword: "1234",
 
