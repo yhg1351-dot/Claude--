@@ -37,6 +37,30 @@ function deviceId() {
   return id;
 }
 function progressKey() { return `mq-progress-${state.session.code}`; }
+function draftKeyOf(placeId, missionId) { return `${placeId}/${missionId}`; }
+async function loadDrafts() {
+  state.draft = {};
+  if (!state.session) return;
+  try {
+    for (const d of await store.all("drafts")) {
+      if (d.code !== state.session.code) continue;
+      state.draft[draftKeyOf(d.placeId, d.missionId)] = { choice: d.choice ?? null, text: d.text || "", photos: d.photos || [] };
+    }
+  } catch (e) { console.error(e); }
+}
+let draftTimer = null;
+function saveDraft(placeId, missionId) {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    const d = state.draft[draftKeyOf(placeId, missionId)];
+    if (!d || !state.session) return;
+    store.put("drafts", { key: `${state.session.code}:${missionId}`, code: state.session.code, placeId, missionId, choice: d.choice, text: d.text, photos: d.photos, at: Date.now() }).catch(() => {});
+  }, 250);
+}
+function clearDraft(placeId, missionId) {
+  delete state.draft[draftKeyOf(placeId, missionId)];
+  if (state.session) store.del("drafts", `${state.session.code}:${missionId}`).catch(() => {});
+}
 function loadProgress() { state.progress = state.session ? ls.get(progressKey(), {}) : {}; }
 function saveProgress() { if (state.session) ls.set(progressKey(), state.progress); }
 function place(id) { return state.data.places[id]; }
@@ -81,6 +105,7 @@ async function login(code) {
     state.loginMessage = null;
     ls.set("mq-session", state.session);
     loadProgress();
+    await loadDrafts();
     resumeAfterLogin();
     await pullProgress();
     return { ok: true };
@@ -94,13 +119,33 @@ function logoutLocal(message) {
   location.hash = "#/";
   render();
 }
+// 서버가 접속 정보를 모를 때(삭제·해제 등) 같은 기기로 조용히 다시 접속한다.
+// 다른 기기가 실제로 쓰고 있을 때만 로그아웃한다.
+let recovering = null;
+async function recoverSession() {
+  if (!state.session) return false;
+  if (recovering) return recovering;
+  recovering = (async () => {
+    const r = await backend.claimGroup(state.session.code, state.session.deviceId || deviceId());
+    if (r.ok) {
+      state.session = { ...state.session, token: r.token, at: Date.now() };
+      ls.set("mq-session", state.session);
+      resumeAfterLogin();
+      return true;
+    }
+    if (r.reason === "in_use") {
+      logoutLocal("다른 기기에서 이 모둠 코드로 접속했어요. 그 폰을 쓰거나, 선생님께 접속 해제를 요청한 뒤 코드를 다시 입력해 주세요.");
+    }
+    // 네트워크 오류면 그대로 두고 다음에 다시 시도
+    return false;
+  })();
+  try { return await recovering; } finally { recovering = null; }
+}
 let hbTimer = null;
 async function heartbeat() {
   if (!state.session || !navigator.onLine) return;
   const r = await backend.heartbeat(state.session.token);
-  if (!r.ok && r.reason === "invalid") {
-    logoutLocal("다른 기기에서 이 모둠 코드로 접속했거나, 선생님이 접속을 해제했어요. 코드를 다시 입력해 주세요.");
-  }
+  if (!r.ok && r.reason === "invalid") await recoverSession();
 }
 function startHeartbeat() {
   if (hbTimer) return;
@@ -336,7 +381,7 @@ function viewMission(placeId, missionId) {
   const m = findMission(placeId, missionId);
   const p = place(placeId);
   const prev = state.progress[m.id];
-  const draftKey = `${placeId}/${missionId}`;
+  const draftKey = draftKeyOf(placeId, missionId);
   const draft = state.draft[draftKey] || (state.draft[draftKey] = { choice: prev?.answer?.choice ?? null, text: prev?.answer?.text || "", photos: [] });
 
   const wrap = el("div");
@@ -364,6 +409,7 @@ function viewMission(placeId, missionId) {
       b.addEventListener("click", () => {
         draft.choice = i;
         body.querySelectorAll(".option").forEach((o, j) => o.classList.toggle("selected", j === i));
+        saveDraft(placeId, missionId);
       });
       body.append(b);
     });
@@ -372,7 +418,7 @@ function viewMission(placeId, missionId) {
   if (m.type === "text" || (m.type === "photo" && m.caption)) {
     textarea = el("textarea", { class: "input", placeholder: m.type === "text" ? "모둠의 답을 적어 주세요" : m.caption, maxlength: "500" });
     textarea.value = draft.text;
-    textarea.addEventListener("input", () => { draft.text = textarea.value; });
+    textarea.addEventListener("input", () => { draft.text = textarea.value; saveDraft(placeId, missionId); });
     body.append(el("div", { class: "field" }, [m.type === "photo" ? el("label", {}, m.caption) : null, textarea]));
   }
   let photoGrid = null;
@@ -392,6 +438,7 @@ function viewMission(placeId, missionId) {
       try {
         const blob = await compressImage(f, CFG.photo || {});
         draft.photos.push(blob);
+        saveDraft(placeId, missionId);
       } catch (e) {
         console.error(e);
         toast("사진을 읽지 못했어요. 다른 사진으로 다시 시도해 주세요.", "error");
@@ -407,7 +454,7 @@ function viewMission(placeId, missionId) {
         const url = URL.createObjectURL(blob);
         const img = el("img", { src: url, alt: `사진 ${i + 1}` });
         img.onload = () => URL.revokeObjectURL(url);
-        photoGrid.append(el("div", { class: "ph" }, [img, el("button", { class: "rm", "aria-label": "삭제", onclick: () => { draft.photos.splice(i, 1); renderPhotos(); } }, "✕")]));
+        photoGrid.append(el("div", { class: "ph" }, [img, el("button", { class: "rm", "aria-label": "삭제", onclick: () => { draft.photos.splice(i, 1); saveDraft(placeId, missionId); renderPhotos(); } }, "✕")]));
       });
       if (draft.photos.length < max) {
         photoGrid.append(el("button", { class: "add", onclick: () => fileInput.click() }, [el("span", {}, "📷"), draft.photos.length ? "추가" : "사진 찍기"]));
@@ -453,7 +500,7 @@ function viewMission(placeId, missionId) {
       await enqueue({ code: state.session.code, placeId, missionId: m.id, answer, photos: draft.photos });
       state.progress[m.id] = { status: "queued", answer, photoCount: draft.photos.length, at: new Date().toISOString() };
       saveProgress();
-      delete state.draft[draftKey];
+      clearDraft(placeId, missionId);
       toast(navigator.onLine ? "제출했어요! 전송 중…" : "저장했어요! 인터넷이 연결되면 자동으로 보내요.", "ok");
       go(`#/place/${placeId}`);
     } catch (e) {
@@ -510,7 +557,7 @@ async function init() {
     return;
   }
   state.session = ls.get("mq-session");
-  if (state.session) loadProgress();
+  if (state.session) { loadProgress(); await loadDrafts(); }
 
   onSync(async (ev) => {
     if (ev.type === "uploading") syncMsg = `📤 사진 전송 중 (${ev.index + 1}/${ev.total})`;
@@ -522,7 +569,7 @@ async function init() {
       if (route().name !== "mission") render();
     } else if (ev.type === "invalid_token") {
       syncMsg = null;
-      logoutLocal("접속이 만료되어 남은 제출을 보내지 못했어요. 모둠 코드를 다시 입력하면 이어서 보내요.");
+      await recoverSession();
     } else if (ev.type === "idle" || ev.type === "error") syncMsg = null;
     await refreshPending();
   });

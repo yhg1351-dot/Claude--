@@ -1,6 +1,6 @@
 // IndexedDB 저장소: 전송 대기열(outbox)과 사진 원본(photos)을 폰에 보관한다.
 const DB_NAME = "museum-quiz";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 let dbPromise = null;
 
 function open() {
@@ -15,6 +15,10 @@ function open() {
       }
       if (!db.objectStoreNames.contains("photos")) {
         db.createObjectStore("photos", { keyPath: "key" });
+      }
+      if (!db.objectStoreNames.contains("drafts")) {
+        // 입력 중인 답과 사진 (카메라 앱에서 돌아올 때 페이지가 새로 고쳐져도 유지)
+        db.createObjectStore("drafts", { keyPath: "key" });
       }
       if (!db.objectStoreNames.contains("localSubmissions")) {
         // 데모 모드 전용: 서버 대신 여기에 제출 내용을 저장
