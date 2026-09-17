@@ -2,7 +2,7 @@
 import { store, ls, uuid } from "./store.js";
 import { backend, isConfigured } from "./backend.js";
 import { compressImage } from "./image.js";
-import { enqueue, pending, onSync, startSyncLoop, resumeAfterLogin, kick } from "./sync.js";
+import { enqueue, pending, onSync, startSyncLoop, resumeAfterLogin, kick, retryNow } from "./sync.js";
 
 const CFG = window.APP_CONFIG || {};
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -202,6 +202,7 @@ function viewHome() {
     el("span", { class: "chip" }, codeLabel(state.session.code)),
   ]);
   wrap.append(bar);
+  if (state.pendingItems && state.pendingItems.length) wrap.append(viewPendingCard());
   for (const day of state.data.trip.days) {
     wrap.append(el("div", { class: "day-title" }, day.label || `${day.day}일차`));
     for (const stop of day.stops) {
@@ -238,6 +239,24 @@ function viewHome() {
     } }, "여기를 누르세요"),
   ]));
   return wrap;
+}
+
+// 전송 대기 중인 제출과 마지막 오류를 보여 주는 카드 (문제 파악용)
+function viewPendingCard() {
+  const items = state.pendingItems;
+  const card = el("div", { class: "card", style: "border:1px solid #f3d9a4" });
+  card.append(el("h2", {}, `⏳ 전송 대기 ${items.length}개`));
+  card.append(el("p", { class: "muted small" }, state.online ? "자동으로 다시 보내는 중이에요. 계속 안 되면 아래 오류 내용을 선생님께 보여 주세요." : "인터넷이 연결되면 자동으로 보내요."));
+  for (const it of items) {
+    const m = findMission(it.placeId, it.missionId);
+    card.append(el("div", { class: "notice warn small", style: "word-break:break-all" }, [
+      el("strong", {}, m ? m.title : it.missionId),
+      ` · 사진 ${it.photoPaths.length}장 · 시도 ${it.attempts}회`,
+      it.lastError ? el("div", { style: "margin-top:4px" }, `오류: ${it.lastError}`) : null,
+    ]));
+  }
+  card.append(el("button", { class: "btn", onclick: async () => { syncMsg = "📤 다시 보내는 중…"; renderStatus(); await retryNow(); } }, "지금 다시 보내기"));
+  return card;
 }
 
 function viewPlace(placeId) {
@@ -405,16 +424,26 @@ function renderStatus() {
   let text = "", cls = "";
   if (!state.online) { text = `📴 오프라인 · 저장된 제출 ${state.pendingCount}개는 연결되면 자동 전송`; cls = "warn"; }
   else if (syncMsg) { text = syncMsg; cls = ""; }
-  else if (state.pendingCount > 0) { text = `⏳ 전송 대기 ${state.pendingCount}개 · 자동으로 다시 시도 중`; cls = "warn"; }
+  else if (state.pendingCount > 0) {
+    const err = (state.pendingItems || []).find((i) => i.lastError);
+    text = `⏳ 전송 대기 ${state.pendingCount}개 · 자동으로 다시 시도 중${err ? " · " + String(err.lastError).slice(0, 60) : ""}`;
+    cls = "warn";
+  }
   else { statusEl.classList.add("hidden"); document.body.classList.remove("has-status"); return; }
   statusEl.className = `statusbar ${cls}`;
   statusEl.textContent = text;
   document.body.classList.add("has-status");
 }
 
+let pendingSig = "";
 async function refreshPending() {
-  state.pendingCount = (await pending()).length;
+  const items = await pending();
+  state.pendingItems = items;
+  state.pendingCount = items.length;
   renderStatus();
+  // 대기 목록이 실제로 바뀌었을 때만 홈 화면을 다시 그린다
+  const sig = items.map((i) => `${i.id}:${i.attempts}:${i.lastError || ""}`).join("|");
+  if (sig !== pendingSig) { pendingSig = sig; if (route().name === "home") render(); }
 }
 
 // ------------------------------------------------------------ 시작

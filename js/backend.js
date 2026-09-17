@@ -22,7 +22,7 @@ function makeSupabase() {
     const timer = setTimeout(() => ctrl.abort(), 20000);
     try {
       const { data, error } = await client.rpc(name, args).abortSignal(ctrl.signal);
-      if (error) return { ok: false, reason: "network", message: error.message };
+      if (error) return { ok: false, reason: "network", message: `${name} 실패 ${error.code || ""}: ${error.message}` };
       return data && typeof data === "object" ? data : { ok: true, data };
     } catch (e) {
       return netErr(e);
@@ -41,12 +41,13 @@ function makeSupabase() {
       try {
         const { error } = await client.storage.from("photos").upload(path, blob, {
           contentType: "image/jpeg",
-          upsert: true,
+          upsert: false,
         });
         if (error) {
           // 같은 파일이 이미 있으면 성공으로 간주 (재시도 중복)
-          if (/exists|duplicate/i.test(error.message)) return { ok: true };
-          return { ok: false, reason: "network", message: error.message };
+          if (/exists|duplicate/i.test(error.message) || error.statusCode === "409" || error.status === 409) return { ok: true };
+          const code = error.statusCode || error.status || "";
+          return { ok: false, reason: "network", message: `사진 업로드 실패 ${code}: ${error.message}` };
         }
         return { ok: true };
       } catch (e) {

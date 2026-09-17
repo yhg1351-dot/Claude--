@@ -55,6 +55,16 @@ export async function pending() {
   return (await store.all("outbox")).sort((a, b) => a.createdAt - b.createdAt);
 }
 
+// 대기 중인 항목을 지금 바로 다시 보내기 (재시도 대기 시간 무시)
+export async function retryNow() {
+  for (const item of await pending()) {
+    item.nextAt = 0;
+    await store.put("outbox", item);
+  }
+  blockedByToken = false;
+  kick();
+}
+
 export function kick() {
   if (!running) process();
 }
