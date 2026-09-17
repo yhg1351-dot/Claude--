@@ -13,8 +13,13 @@ function netErr(e) {
 
 // ---------------------------------------------------------------- Supabase
 function makeSupabase() {
+  // 교사 화면만 로그인 세션을 저장한다. 학생 앱은 같은 브라우저에 교사 로그인이 남아 있어도
+  // 항상 '로그인 없음(anon)' 자격으로 요청해야 사진 업로드 규칙에 맞는다.
+  const isTeacher = window.APP_ROLE === "teacher";
   const client = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, {
-    auth: { persistSession: true, autoRefreshToken: true, storageKey: "mq-teacher-auth" },
+    auth: isTeacher
+      ? { persistSession: true, autoRefreshToken: true, storageKey: "mq-teacher-auth" }
+      : { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 
   async function rpc(name, args) {

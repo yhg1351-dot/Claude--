@@ -213,12 +213,13 @@ $$;
 revoke all on function public.is_group_active(text) from public;
 grant execute on function public.is_group_active(text) to anon, authenticated;
 
--- 학생(anon): 최근 접속 신호가 있는 모둠 폴더에만 올릴 수 있고, 보거나 지울 수는 없다
+-- 학생: 접속한 적 있는 모둠 폴더에만 올릴 수 있고, 보거나 지울 수는 없다.
+-- (같은 브라우저에 교사 로그인이 남아 있어도 올릴 수 있도록 authenticated 도 허용)
 drop policy if exists student_upload_photos on storage.objects;
-create policy student_upload_photos on storage.objects for insert to anon
+create policy student_upload_photos on storage.objects for insert to anon, authenticated
   with check (bucket_id = 'photos' and public.is_group_active((storage.foldername(name))[1]));
 drop policy if exists student_upsert_photos on storage.objects;
-create policy student_upsert_photos on storage.objects for update to anon
+create policy student_upsert_photos on storage.objects for update to anon, authenticated
   using (bucket_id = 'photos')
   with check (bucket_id = 'photos' and public.is_group_active((storage.foldername(name))[1]));
 
