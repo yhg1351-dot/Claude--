@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>교사 확인 화면 · 경주 수학여행 미션</title>
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./css/app.css">
+</head>
+<body>
+  <main id="app" class="app wide">
+    <div class="card" style="margin-top:24px;text-align:center"><span class="spinner"></span> 불러오는 중…</div>
+  </main>
+  <script src="./js/config.js"></script>
+  <script>
+    if (window.APP_CONFIG && window.APP_CONFIG.supabaseUrl) {
+      document.write('<script src="./vendor/supabase.js"><\/script>');
+    }
+  </script>
+  <script type="module" src="./js/teacher.js"></script>
+</body>
+</html>
