@@ -56,7 +56,7 @@ function validCode(code) {
   return g >= 1 && g <= cls.groups;
 }
 function toast(msg, kind = "info", ms = 2500) {
-  const t = el("div", { class: `notice ${kind}`, style: "position:fixed;left:16px;right:16px;top:12px;z-index:50;box-shadow:var(--shadow)" }, msg);
+  const t = el("div", { class: `notice toast ${kind}` }, msg);
   document.body.append(t);
   setTimeout(() => t.remove(), ms);
 }
@@ -149,16 +149,29 @@ function render() {
   window.scrollTo(0, 0);
 }
 
+function heroSkyline() {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 400 60"); svg.setAttribute("class", "skyline"); svg.setAttribute("preserveAspectRatio", "none");
+  svg.innerHTML = '<path d="M0 60 L0 44 L30 44 L36 30 L42 44 L70 44 L70 36 L84 26 L98 36 L98 44 L130 44 L134 22 L138 12 L142 22 L146 44 L180 44 L188 34 L196 44 L230 44 L232 30 L240 18 L248 30 L250 44 L290 44 L296 38 L302 44 L330 44 L338 26 L346 44 L400 44 L400 60 Z" fill="rgba(255,255,255,.12)"/><path d="M0 60 L0 50 L60 50 L66 42 L72 50 L120 50 L126 44 L132 50 L200 50 L206 40 L212 50 L280 50 L286 45 L292 50 L400 50 L400 60 Z" fill="rgba(255,255,255,.18)"/>';
+  return svg;
+}
+
 function viewLogin() {
   const wrap = el("div");
-  wrap.append(el("div", { class: "topbar" }, el("h1", {}, state.data.trip.title)));
+  const hero = el("div", { class: "hero" }, [
+    el("div", { class: "eyebrow" }, "Gyeongju Field Trip"),
+    el("h1", {}, state.data.trip.title),
+    el("p", {}, "천 년의 도시에서 모둠 미션에 도전해요"),
+  ]);
+  hero.append(heroSkyline());
+  wrap.append(hero);
   const msg = state.loginMessage;
   const input = el("input", { class: "input code-input", inputmode: "numeric", pattern: "[0-9]*", maxlength: "4", placeholder: "6101", autocomplete: "off" });
   const err = el("div", { class: "notice error hidden" });
   const btn = el("button", { class: "btn primary" }, "시작하기");
-  const card = el("div", { class: "card" }, [
+  const card = el("div", { class: "card login-card" }, [
     el("h2", {}, "모둠 코드를 입력하세요"),
-    el("p", { class: "muted" }, "예: 6학년 1반 1모둠 → 6101, 6학년 1반 10모둠 → 6110"),
+    el("p", { class: "muted" }, "학년·반·모둠 순서예요. 예: 6학년 1반 1모둠 → 6101"),
     msg ? el("div", { class: "notice warn" }, msg) : null,
     el("div", { class: "field" }, input),
     err,
@@ -189,6 +202,22 @@ function viewLogin() {
   return wrap;
 }
 
+function totalProgress() {
+  let done = 0, total = 0;
+  for (const p of Object.values(state.data.places)) for (const m of p.missions || []) { total++; if (state.progress[m.id]) done++; }
+  return { done, total };
+}
+function ringEl(done, total) {
+  const r = 30, c = 2 * Math.PI * r;
+  const pct = total ? done / total : 0;
+  const box = el("div", { class: "ring" });
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 76 76");
+  svg.innerHTML = `<circle class="track" cx="38" cy="38" r="${r}"/><circle class="bar" cx="38" cy="38" r="${r}" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - pct)}"/>`;
+  box.append(svg, el("div", { class: "txt" }, [`${Math.round(pct * 100)}%`, el("small", {}, `${done}/${total}`)]));
+  return box;
+}
+
 function placeProgress(placeId) {
   const ms = missionsOf(placeId);
   const done = ms.filter((m) => state.progress[m.id]).length;
@@ -197,33 +226,40 @@ function placeProgress(placeId) {
 
 function viewHome() {
   const wrap = el("div");
-  const bar = el("div", { class: "topbar" }, [
-    el("h1", {}, state.data.trip.title),
-    el("span", { class: "chip" }, codeLabel(state.session.code)),
-  ]);
-  wrap.append(bar);
+  const tp = totalProgress();
+  wrap.append(el("div", { class: "topbar" }, el("h1", {}, state.data.trip.title)));
+  wrap.append(el("div", { class: "home-head" }, [
+    el("div", { class: "who" }, [
+      el("div", { class: "g" }, `${state.session.code[0]}학년 ${state.session.code[1]}반`),
+      el("div", { class: "n" }, `${parseInt(state.session.code.slice(2), 10)}모둠`),
+      el("div", { class: "s" }, tp.done === tp.total && tp.total > 0 ? "🎉 모든 미션을 마쳤어요!" : tp.done === 0 ? "첫 미션을 시작해 보세요" : `미션 ${tp.total - tp.done}개가 남았어요`),
+    ]),
+    ringEl(tp.done, tp.total),
+  ]));
   if (state.pendingItems && state.pendingItems.length) wrap.append(viewPendingCard());
   for (const day of state.data.trip.days) {
     wrap.append(el("div", { class: "day-title" }, day.label || `${day.day}일차`));
+    const tl = el("div", { class: "timeline" });
     for (const stop of day.stops) {
       const p = place(stop.placeId);
       if (!p) continue;
       const isMission = p.type === "mission";
       const pr = isMission ? placeProgress(stop.placeId) : null;
-      const btn = el("button", { class: `stop ${isMission ? "" : "info"}`, onclick: () => go(`#/place/${stop.placeId}`) }, [
+      const complete = isMission && pr.total > 0 && pr.done === pr.total;
+      const btn = el("button", { class: `stop ${isMission ? "" : "info"} ${complete ? "complete" : ""}`, onclick: () => go(`#/place/${stop.placeId}`) }, [
         el("div", { class: "emoji" }, p.emoji || "📍"),
-        el("div", {}, [
+        el("div", { class: "body" }, [
           el("div", { class: "name" }, p.name),
           el("div", { class: "meta" }, [stop.time ? `${stop.time} · ` : "", isMission ? `미션 ${pr.total}개` : "안내"]),
+          isMission ? el("div", { class: "progress-bar" }, el("i", { style: `width:${pr.total ? (pr.done / pr.total) * 100 : 0}%` })) : null,
         ]),
         isMission
-          ? el("div", { class: "prog" }, [
-              el("span", { class: `chip ${pr.done === pr.total && pr.total > 0 ? "ok" : "gray"}` }, `${pr.done}/${pr.total}`),
-            ])
-          : el("div", { class: "prog muted" }, "›"),
+          ? el("div", { class: "prog" }, el("span", { class: `pill-count ${complete ? "done" : pr.done > 0 ? "partial" : ""}` }, `${pr.done}/${pr.total}`))
+          : el("div", { class: "arrow" }, "›"),
       ]);
-      wrap.append(btn);
+      tl.append(btn);
     }
+    wrap.append(tl);
   }
   wrap.append(el("p", { class: "muted small", style: "margin-top:20px;text-align:center" }, [
     "다른 모둠 코드로 바꾸려면 ",
@@ -262,18 +298,25 @@ function viewPendingCard() {
 function viewPlace(placeId) {
   const p = place(placeId);
   const wrap = el("div");
+  const ms = missionsOf(placeId);
   wrap.append(el("div", { class: "topbar" }, [
     el("button", { class: "back", onclick: () => go("#/") }, "‹"),
-    el("h1", {}, `${p.emoji || ""} ${p.name}`),
+    el("h1", {}, p.name),
     el("span", { class: "chip" }, codeLabel(state.session.code)),
   ]));
-  if (p.intro) wrap.append(el("div", { class: "card" }, el("p", {}, p.intro)));
-  const ms = missionsOf(placeId);
+  wrap.append(el("div", { class: "place-head" }, [
+    el("div", { class: "emoji" }, p.emoji || "📍"),
+    el("div", {}, [el("div", { class: "t" }, p.name), el("div", { class: "d" }, ms.length ? `미션 ${ms.length}개` : "안내")]),
+  ]));
+  if (p.intro) wrap.append(el("div", { class: "card" }, el("p", { class: "intro" }, p.intro)));
   if (!ms.length) return wrap;
   const pr = placeProgress(placeId);
-  wrap.append(el("div", { class: "card", style: "padding:12px 16px" }, [
-    el("div", { class: "row" }, [el("strong", {}, "진행 상황"), el("span", { style: "text-align:right" }, `${pr.done} / ${pr.total} 완료`)]),
-    el("div", { class: "progress-bar" }, el("i", { style: `width:${pr.total ? (pr.done / pr.total) * 100 : 0}%` })),
+  wrap.append(el("div", { class: "card prog-card" }, [
+    el("div", { style: "flex:1" }, [
+      el("div", { class: "muted small", style: "font-weight:700" }, "진행 상황"),
+      el("div", { class: "progress-bar" }, el("i", { style: `width:${pr.total ? (pr.done / pr.total) * 100 : 0}%` })),
+    ]),
+    el("div", { class: "num" }, [String(pr.done), el("small", {}, ` / ${pr.total}`)]),
   ]));
   ms.forEach((m, i) => {
     const st = state.progress[m.id];
@@ -281,8 +324,8 @@ function viewPlace(placeId) {
     const label = !st ? "" : st.status === "sent" ? "완료" : "전송 대기";
     wrap.append(el("button", { class: `mission-item ${cls}`, onclick: () => go(`#/mission/${placeId}/${m.id}`) }, [
       el("div", { class: "idx" }, st ? "✓" : String(i + 1)),
-      el("div", {}, [el("div", { class: "t" }, m.title), el("div", { class: "w" }, [typeIcon(m.type), " ", m.where || ""])]),
-      label ? el("span", { class: `chip st ${st.status === "sent" ? "ok" : "warn"}` }, label) : el("span", { class: "st muted" }, "›"),
+      el("div", { class: "body" }, [el("div", { class: "t" }, m.title), el("div", { class: "w" }, [typeIcon(m.type), " ", m.where || ""])]),
+      label ? el("span", { class: `chip st ${st.status === "sent" ? "ok" : "warn"}` }, label) : el("span", { class: "st arrow" }, "›"),
     ]));
   });
   return wrap;
@@ -302,9 +345,10 @@ function viewMission(placeId, missionId) {
     el("h1", {}, p.name),
     el("span", { class: "chip" }, codeLabel(state.session.code)),
   ]));
-  const card = el("div", { class: "card" });
-  card.append(el("h2", {}, [typeIcon(m.type), " ", m.title]));
-  if (m.where) card.append(el("div", { class: "where" }, [el("span", {}, "📍"), el("span", {}, [el("strong", {}, "어디서: "), m.where])]));
+  const card = el("div", { class: "card mission-card" });
+  card.append(el("div", { class: "kind" }, [typeIcon(m.type), " ", m.type === "photo" ? "사진 미션" : m.type === "choice" ? "퀴즈" : "생각 쓰기"]));
+  card.append(el("h2", {}, m.title));
+  if (m.where) card.append(el("div", { class: "where" }, [el("span", {}, "📍"), el("span", {}, [el("strong", {}, "어디서 "), m.where])]));
   if (prev) card.append(el("div", { class: `notice ${prev.status === "sent" ? "ok" : "warn"}` }, prev.status === "sent" ? "✓ 제출 완료! 다시 제출하면 새 내용으로 바뀌어요." : "⏳ 저장됨. 인터넷이 연결되면 자동으로 보내요. 다시 제출하면 새 내용으로 바뀌어요."));
   card.append(el("div", { class: "question" }, m.question || ""));
   if (m.hint) card.append(el("details", { class: "hint" }, [el("summary", {}, "힌트 보기"), el("p", {}, m.hint)]));
@@ -380,7 +424,7 @@ function viewMission(placeId, missionId) {
   }
   card.append(body, err);
 
-  const submitBtn = el("button", { class: "btn primary", style: "margin-top:8px" }, prev ? "다시 제출하기" : "제출하기");
+  const submitBtn = el("button", { class: "btn gold" }, prev ? "다시 제출하기" : "제출하기");
   submitBtn.addEventListener("click", async () => {
     err.classList.add("hidden");
     let answer;
@@ -410,7 +454,7 @@ function viewMission(placeId, missionId) {
     }
     function showErr(t) { err.textContent = t; err.classList.remove("hidden"); submitBtn.disabled = false; submitBtn.textContent = prev ? "다시 제출하기" : "제출하기"; }
   });
-  card.append(submitBtn);
+  card.append(el("div", { class: "submit-wrap" }, submitBtn));
   wrap.append(card);
   return wrap;
 }

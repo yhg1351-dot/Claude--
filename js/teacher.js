@@ -143,11 +143,11 @@ function viewLogin() {
 function viewHeader() {
   const tabs = [["overview", "현황"], ["byPlace", "장소별 제출"], ["byGroup", "모둠별 제출"], ["tools", "도구"]];
   return el("div", {}, [
-    el("div", { class: "topbar" }, [
-      el("h1", {}, `${state.data.trip.title} · 교사`),
-      el("span", { class: "muted small" }, state.loadedAt ? `갱신 ${fmtTime(state.loadedAt.toISOString())}` : ""),
-      el("button", { class: "btn small", onclick: load }, "새로고침"),
-      el("button", { class: "btn small ghost", onclick: async () => { await backend.teacherLogout(); state.loggedIn = false; render(); } }, "로그아웃"),
+    el("div", { class: "teacher-top" }, [
+      el("h1", {}, "교사 확인 화면"),
+      el("span", { class: "muted small" }, state.loadedAt ? `${fmtTime(state.loadedAt.toISOString())} 갱신` : ""),
+      el("button", { class: "btn small", onclick: load, "aria-label": "새로고침" }, "↻"),
+      el("button", { class: "btn small ghost", onclick: async () => { await backend.teacherLogout(); state.loggedIn = false; render(); } }, "나가기"),
     ]),
     el("div", { class: "tabs" }, tabs.map(([k, l]) => el("button", { class: k === state.tab ? "active" : "", onclick: () => { state.tab = k; render(); } }, l))),
     el("div", { class: "toolbar" }, [
@@ -172,8 +172,8 @@ function viewOverview() {
 
   const wrap = el("div");
   wrap.append(el("div", { class: "kpis" }, [
-    kpi(codes.length, "모둠 수"), kpi(active, "지금 접속 중"), kpi(submittedGroups, "제출 시작한 모둠"),
-    kpi(state.submissions.filter((s) => codes.includes(s.group_code)).length, `제출 건수 (모둠당 최대 ${totalMissions})`), kpi(photoCount, "사진 수"),
+    kpi(`${active}/${codes.length}`, "접속 중 / 모둠"), kpi(`${submittedGroups}`, "제출 시작한 모둠"),
+    kpi(state.submissions.filter((s) => codes.includes(s.group_code)).length, `제출 건수 (최대 ${totalMissions * codes.length})`), kpi(photoCount, "사진 수"),
   ]));
 
   const thead = el("tr", {}, [el("th", {}, "모둠"), el("th", {}, "접속"), ...places.map(([, p]) => el("th", {}, p.name)), el("th", {}, "최근 제출")]);
@@ -201,7 +201,26 @@ function viewOverview() {
       el("td", { class: "muted" }, last ? fmtTime(last) : "-"),
     ]);
   });
-  wrap.append(el("div", { class: "table-wrap" }, el("table", { class: "grid" }, [el("thead", {}, thead), el("tbody", {}, rows)])));
+  wrap.append(el("div", { class: "table-wrap overview" }, el("table", { class: "grid" }, [el("thead", {}, thead), el("tbody", {}, rows)])));
+  // 모바일용 카드
+  const cards = el("div", { class: "group-cards" });
+  for (const code of codes) {
+    const s = sessByCode.get(code);
+    const st = sessionStatus(s);
+    const hd = el("div", { class: "hd" }, [el("strong", {}, codeLabel(code)), el("span", { class: `chip ${st.cls}` }, st.label)]);
+    if (s && st.cls !== "gray") hd.append(el("button", { class: "btn small ghost", onclick: async () => {
+      if (!confirm(`${codeLabel(code)}의 접속을 해제할까요?`)) return;
+      const r = await backend.releaseGroup(code);
+      if (!r.ok) alert(`실패: ${r.message || ""}`); else load();
+    } }, "해제"));
+    const pls = el("div", { class: "places" }, places.map(([, p]) => {
+      const total = (p.missions || []).length;
+      const done = (p.missions || []).filter((m) => sm.has(`${code}:${m.id}`)).length;
+      return el("div", { class: "pl" }, [el("div", { class: "n" }, p.name), el("div", { class: "v" }, `${done}/${total}`), el("div", { class: "mini" }, el("i", { style: `width:${total ? (done / total) * 100 : 0}%` }))]);
+    }));
+    cards.append(el("div", { class: "group-card" }, [hd, pls]));
+  }
+  wrap.append(cards);
   wrap.append(el("p", { class: "muted small" }, `접속 표시: "접속 중"은 최근 ${CFG.lockTimeoutMinutes || 5}분 안에 신호가 온 기기가 있음. "잠금 풀림"은 신호가 끊겨 다른 기기가 들어올 수 있는 상태. 30초마다 자동 갱신.`));
   return wrap;
 }
@@ -243,7 +262,7 @@ function viewByGroup() {
   wrap.append(el("div", { class: "toolbar" }, [el("label", { class: "muted small" }, "모둠: "), sel]));
   for (const [pid, p] of missionPlaces()) {
     const card = el("div", { class: "card" });
-    card.append(el("h2", {}, p.name));
+    card.append(el("h2", {}, [p.emoji ? `${p.emoji} ` : "", p.name]));
     for (const m of p.missions || []) {
       const s = sm.get(`${state.groupSel}:${m.id}`);
       if (!s) { card.append(el("div", { class: "sub-card", style: "opacity:.6" }, [el("div", { class: "hdr" }, [el("strong", {}, m.title), el("span", { class: "chip gray" }, "미제출")])])); continue; }

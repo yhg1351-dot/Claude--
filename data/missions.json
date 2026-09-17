@@ -3,32 +3,82 @@
     "title": "6학년 경주 수학여행",
     "grade": 6,
     "classes": [
-      { "class": 1, "groups": 10 },
-      { "class": 2, "groups": 10 },
-      { "class": 3, "groups": 10 },
-      { "class": 4, "groups": 10 },
-      { "class": 5, "groups": 10 },
-      { "class": 6, "groups": 10 },
-      { "class": 7, "groups": 10 }
+      {
+        "class": 1,
+        "groups": 6
+      },
+      {
+        "class": 2,
+        "groups": 6
+      },
+      {
+        "class": 3,
+        "groups": 6
+      },
+      {
+        "class": 4,
+        "groups": 6
+      },
+      {
+        "class": 5,
+        "groups": 6
+      },
+      {
+        "class": 6,
+        "groups": 6
+      },
+      {
+        "class": 7,
+        "groups": 6
+      },
+      {
+        "class": 8,
+        "groups": 6
+      },
+      {
+        "class": 9,
+        "groups": 6
+      }
     ],
     "days": [
       {
         "day": 1,
         "label": "1일차",
         "stops": [
-          { "placeId": "bulguksa", "time": "10:00" },
-          { "placeId": "gyeongju-world", "time": "13:30" },
-          { "placeId": "hotel", "time": "18:00" }
+          {
+            "placeId": "bulguksa",
+            "time": "10:00"
+          },
+          {
+            "placeId": "gyeongju-world",
+            "time": "13:30"
+          },
+          {
+            "placeId": "hotel",
+            "time": "18:00"
+          }
         ]
       },
       {
         "day": 2,
         "label": "2일차",
         "stops": [
-          { "placeId": "hotel", "time": "08:30" },
-          { "placeId": "museum", "time": "10:00" },
-          { "placeId": "restaurant", "time": "12:30" },
-          { "placeId": "school", "time": "16:00" }
+          {
+            "placeId": "hotel",
+            "time": "08:30"
+          },
+          {
+            "placeId": "museum",
+            "time": "10:00"
+          },
+          {
+            "placeId": "restaurant",
+            "time": "12:30"
+          },
+          {
+            "placeId": "school",
+            "time": "16:00"
+          }
         ]
       }
     ]
@@ -46,7 +96,12 @@
           "title": "불국사는 언제 지어졌을까?",
           "where": "일주문 옆 안내판",
           "question": "안내판을 읽고 불국사가 처음 지어진 시대를 고르세요.",
-          "options": ["고구려", "백제", "신라", "고려"],
+          "options": [
+            "고구려",
+            "백제",
+            "신라",
+            "고려"
+          ],
           "answer": 2,
           "hint": "경주는 어느 나라의 수도였을까요?"
         },
@@ -73,7 +128,12 @@
           "title": "그림자가 없는 탑",
           "where": "석가탑 안내판",
           "question": "석가탑의 다른 이름은 무엇일까요?",
-          "options": ["무영탑", "다보탑", "황룡탑", "첨성탑"],
+          "options": [
+            "무영탑",
+            "다보탑",
+            "황룡탑",
+            "첨성탑"
+          ],
           "answer": 0,
           "hint": "'그림자가 없다'는 뜻의 한자어를 찾아보세요."
         },
@@ -100,7 +160,12 @@
           "title": "안전 먼저!",
           "where": "놀이기구 탑승 전",
           "question": "놀이기구를 타기 전에 꼭 해야 하는 일은 무엇일까요?",
-          "options": ["친구를 앞으로 밀어 준다", "안전바가 잠겼는지 확인한다", "휴대폰으로 영상을 찍는다", "신발을 벗는다"],
+          "options": [
+            "친구를 앞으로 밀어 준다",
+            "안전바가 잠겼는지 확인한다",
+            "휴대폰으로 영상을 찍는다",
+            "신발을 벗는다"
+          ],
           "answer": 1
         },
         {
@@ -133,7 +198,12 @@
           "title": "종소리에 담긴 이야기",
           "where": "야외 종각 (성덕대왕신종)",
           "question": "성덕대왕신종의 다른 이름은 무엇일까요?",
-          "options": ["보신각종", "에밀레종", "상원사종", "천마종"],
+          "options": [
+            "보신각종",
+            "에밀레종",
+            "상원사종",
+            "천마종"
+          ],
           "answer": 1,
           "hint": "종소리가 '에밀레~'처럼 들린다는 전설이 있어요."
         },
@@ -160,7 +230,12 @@
           "title": "신라 왕의 무덤",
           "where": "신라역사관 무덤 전시 코너",
           "question": "신라 왕들의 무덤 방식으로, 나무 방 위에 돌을 쌓고 흙을 덮은 형태를 무엇이라고 할까요?",
-          "options": ["돌무지덧널무덤", "고인돌", "벽돌무덤", "피라미드"],
+          "options": [
+            "돌무지덧널무덤",
+            "고인돌",
+            "벽돌무덤",
+            "피라미드"
+          ],
           "answer": 0
         },
         {
