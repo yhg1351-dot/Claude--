@@ -1,6 +1,6 @@
 // 서비스 워커: 앱 파일을 폰에 캐시해 신호가 약해도 화면이 열리게 한다.
 // 네트워크 우선(최신 파일), 실패하면 캐시 사용. Supabase 요청은 건드리지 않는다.
-const VERSION = "mq-v7";
+const VERSION = "mq-v8";
 const PRECACHE = [
   "./",
   "./index.html",
@@ -15,6 +15,7 @@ const PRECACHE = [
   "./js/image.js",
   "./data/missions.json",
   "./vendor/supabase.js",
+  "./vendor/fflate.js",
   "./manifest.webmanifest",
   "./icons/icon.svg",
   "./icons/icon-192.png",

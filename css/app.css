@@ -249,5 +249,6 @@ table.grid tr:last-child td { border-bottom: 0; }
 .thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .thumbs img { width: 92px; height: 92px; object-fit: cover; border-radius: 10px; background: #ece8df; cursor: zoom-in; }
 .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.92); display: grid; place-items: center; z-index: 30; }
-.lightbox img { max-width: 96vw; max-height: 92vh; object-fit: contain; border-radius: 6px; }
+.lightbox img { max-width: 96vw; max-height: 84vh; object-fit: contain; border-radius: 6px; }
+.lightbox .lb-bar { position: fixed; left: 0; right: 0; bottom: calc(14px + var(--safe-b)); display: flex; gap: 10px; justify-content: center; }
 .mission-section { margin: 18px 0 8px; font-size: 15px; font-weight: 800; color: var(--ink-2); }

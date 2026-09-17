@@ -285,16 +285,37 @@ function subCard(s, m, showGroup) {
   if (paths.length) {
     card.append(el("div", { class: "thumbs" }, paths.map((p) => {
       const url = state.urls[p];
-      const img = el("img", { src: url || "", alt: "제출 사진", loading: "lazy", onclick: () => url && lightbox(url) });
+      const img = el("img", { src: url || "", alt: "제출 사진", loading: "lazy", onclick: () => url && lightbox(url, photoFileName(s, m, paths.indexOf(p))) });
       if (!url) img.style.opacity = ".3";
       return img;
     })));
   }
   return card;
 }
-function lightbox(url) {
+function lightbox(url, filename) {
   const lb = el("div", { class: "lightbox", onclick: () => lb.remove() }, el("img", { src: url }));
+  const bar = el("div", { class: "lb-bar", onclick: (e) => e.stopPropagation() }, [
+    el("button", { class: "btn small", onclick: () => savePhoto(url, filename) }, "⬇ 이 사진 저장"),
+    el("button", { class: "btn small ghost", style: "color:#fff", onclick: () => lb.remove() }, "닫기"),
+  ]);
+  lb.append(bar);
   document.body.append(lb);
+}
+async function savePhoto(url, filename) {
+  try {
+    const r = await fetch(url);
+    const blob = await r.blob();
+    const a = el("a", { href: URL.createObjectURL(blob), download: filename || "photo.jpg" });
+    document.body.append(a); a.click(); a.remove();
+  } catch (e) {
+    alert("저장에 실패했어요. 다시 시도해 주세요.");
+  }
+}
+// 파일 이름에 쓸 수 없는 문자 정리
+function safeName(t) { return String(t || "").replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 40); }
+function photoFileName(s, m, i) {
+  const g = `${s.group_code[1]}반${parseInt(s.group_code.slice(2), 10)}모둠`;
+  return `${g}_${safeName(m ? m.placeName : s.place_id)}_${safeName(m ? m.title : s.mission_id)}_${i + 1}.jpg`;
 }
 
 function viewTools() {
@@ -303,6 +324,18 @@ function viewTools() {
     el("h2", {}, "CSV 내려받기"),
     el("p", { class: "muted" }, "모든 제출 내용을 엑셀에서 열 수 있는 파일로 저장합니다. 사진은 파일 이름만 포함됩니다."),
     el("button", { class: "btn", onclick: downloadCsv }, "CSV 내려받기"),
+  ]));
+  const codes = filteredCodes();
+  const withPhotos = state.submissions.filter((s) => codes.includes(s.group_code) && (s.photo_paths || []).length);
+  const photoTotal = withPhotos.reduce((n, s) => n + s.photo_paths.length, 0);
+  const prog = el("div", { class: "muted small", style: "margin-top:8px" });
+  const zipBtn = el("button", { class: "btn", onclick: () => downloadZip(withPhotos, prog, zipBtn) }, `사진 ${photoTotal}장 ZIP으로 내려받기`);
+  if (!photoTotal) zipBtn.disabled = true;
+  wrap.append(el("div", { class: "card" }, [
+    el("h2", {}, "사진 내려받기"),
+    el("p", { class: "muted" }, `제출된 사진을 반·모둠 폴더로 정리한 ZIP 파일로 저장합니다. 위의 "반" 선택으로 범위를 좁힐 수 있습니다. (현재 ${state.classFilter === "all" ? "전체" : state.classFilter + "반"}: ${withPhotos.length}건, ${photoTotal}장)`),
+    zipBtn, prog,
+    el("p", { class: "muted small" }, "사진 한 장만 저장하려면 장소별·모둠별 제출에서 사진을 눌러 크게 본 뒤 '이 사진 저장'을 누르세요."),
   ]));
   wrap.append(el("div", { class: "card" }, [
     el("h2", {}, "전체 삭제"),
@@ -324,6 +357,46 @@ function viewTools() {
     ]),
   ]));
   return wrap;
+}
+
+// 사진을 모두 받아 ZIP 하나로 묶는다 (브라우저 안에서 처리, 서버 부담 없음)
+async function downloadZip(subs, prog, btn) {
+  if (!window.fflate) { alert("압축 기능을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요."); return; }
+  btn.disabled = true;
+  const files = {};
+  let done = 0, failed = 0;
+  const total = subs.reduce((n, s) => n + s.photo_paths.length, 0);
+  const paths = subs.flatMap((s) => s.photo_paths);
+  prog.textContent = "사진 주소를 준비하는 중…";
+  const urls = await backend.signedUrls(paths);
+  for (const s of subs) {
+    const m = missionById(s.mission_id);
+    const folder = `${s.group_code[0]}학년${s.group_code[1]}반/${parseInt(s.group_code.slice(2), 10)}모둠`;
+    for (let i = 0; i < s.photo_paths.length; i++) {
+      const url = urls[s.photo_paths[i]];
+      const name = `${folder}/${photoFileName(s, m, i)}`;
+      try {
+        if (!url) throw new Error("no url");
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(String(r.status));
+        files[name] = [new Uint8Array(await r.arrayBuffer()), { level: 0 }];
+      } catch (e) {
+        failed++;
+      }
+      done++;
+      prog.textContent = `받는 중 ${done}/${total}${failed ? ` (실패 ${failed})` : ""}`;
+    }
+  }
+  try {
+    const zipped = window.fflate.zipSync(files);
+    const blob = new Blob([zipped], { type: "application/zip" });
+    const a = el("a", { href: URL.createObjectURL(blob), download: `수학여행_사진_${state.classFilter === "all" ? "전체" : state.classFilter + "반"}_${new Date().toISOString().slice(0, 10)}.zip` });
+    document.body.append(a); a.click(); a.remove();
+    prog.textContent = `완료: ${done - failed}장 저장${failed ? `, ${failed}장 실패(다시 시도해 보세요)` : ""}`;
+  } catch (e) {
+    prog.textContent = "ZIP 생성에 실패했어요. 반을 나눠서 다시 시도해 주세요.";
+  }
+  btn.disabled = false;
 }
 
 function downloadCsv() {
