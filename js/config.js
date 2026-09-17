@@ -2,9 +2,9 @@
 // 데모 모드: 제출 내용이 이 기기(브라우저) 안에만 저장됩니다. 흐름 테스트용.
 window.APP_CONFIG = {
   // Supabase 프로젝트 설정 > API 에서 복사 (예: "https://abcd1234.supabase.co")
-  supabaseUrl: "",
+  supabaseUrl: "https://cjkfuvhwamuzbihsrypk.supabase.co",
   // Supabase 프로젝트 설정 > API > anon public 키
-  supabaseAnonKey: "",
+  supabaseAnonKey: "sb_publishable_vfFMj9c_cMrRpTLyWCdj5w_oah-H-Aj",
 
   // 모둠 코드 접속 잠금: 마지막 신호 후 이 시간(분)이 지나면 다른 기기가 접속할 수 있음
   lockTimeoutMinutes: 5,
