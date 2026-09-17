@@ -178,8 +178,9 @@ begin
   if auth.role() is distinct from 'authenticated' then
     raise exception 'not allowed';
   end if;
-  delete from public.submissions;
-  delete from public.group_sessions;
+  -- Supabase 안전장치(pg-safeupdate) 때문에 조건 없는 delete 는 거부되므로 where true 를 붙인다
+  delete from public.submissions where true;
+  delete from public.group_sessions where true;
   return jsonb_build_object('ok', true);
 end;
 $$;
