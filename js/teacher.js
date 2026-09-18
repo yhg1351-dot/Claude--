@@ -258,7 +258,7 @@ function viewByPlace() {
     const submitted = codes.filter((c) => sm.has(`${c}:${m.id}`));
     const missing = codes.filter((c) => !sm.has(`${c}:${m.id}`));
     card.append(el("h2", {}, [m.title, " ", el("span", { class: "chip gray" }, `${submitted.length}/${codes.length} 제출`)]));
-    card.append(el("p", { class: "muted small" }, m.question));
+    card.append(el("p", { class: "muted small q-text" }, m.question));
     if (m.type === "choice") card.append(el("p", { class: "muted small" }, `정답: ${m.options[m.answer]}`));
     if (missing.length) {
       const list = missing.map(codeLabel).join(", ");
