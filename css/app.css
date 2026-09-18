@@ -133,7 +133,8 @@ textarea.input { min-height: 120px; resize: vertical; line-height: 1.6; }
 .stop .meta { color: var(--muted); font-size: 13px; }
 .stop .prog { flex: none; text-align: right; }
 .stop.info { opacity: .9; }
-.stop.custom { cursor: default; box-shadow: none; border: 1.5px dashed var(--line); background: transparent; }
+.stop.custom { cursor: default; }
+.stop.custom:active { transform: none; }
 .stop.custom .emoji { background: #f1ede4; }
 .stop .arrow { color: #c9c3b6; font-size: 20px; }
 .progress-bar { height: 8px; background: #ece8df; border-radius: 99px; overflow: hidden; margin-top: 8px; }
