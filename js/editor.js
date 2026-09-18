@@ -129,10 +129,16 @@ export function createEditor(container, ctx) {
     const placeOptions = placeList().map(([id, p]) => [id, `${p.emoji || ""} ${p.name}`]);
     (t.days || []).forEach((day, di) => {
       const card = el("div", { class: "card" });
-      card.append(el("h2", {}, [day.label || `${day.day}일차`, el("span", { class: "sp" }), el("button", { class: "btn small ghost", onclick: () => {
-        if (!confirm(`${day.label || day.day + "일차"} 전체를 삭제할까요?`)) return;
-        t.days.splice(di, 1); markDirty(); render();
-      } }, "날짜 삭제")]));
+      card.append(el("h2", {}, [day.label || `${day.day}일차`, el("span", { class: "sp" }),
+        el("div", { class: "stop-actions" }, [
+          el("button", { class: "btn small ghost", "aria-label": "위로", disabled: di === 0, onclick: () => { moveItem(t.days, di, -1); markDirty(); render(); } }, "↑"),
+          el("button", { class: "btn small ghost", "aria-label": "아래로", disabled: di === t.days.length - 1, onclick: () => { moveItem(t.days, di, 1); markDirty(); render(); } }, "↓"),
+          el("button", { class: "btn small ghost", onclick: () => {
+            if (!confirm(`${day.label || day.day + "일차"} 전체를 삭제할까요?`)) return;
+            t.days.splice(di, 1); markDirty(); render();
+          } }, "날짜 삭제"),
+        ]),
+      ]));
       card.append(el("div", { class: "ed-row two" }, [
         field("표시 이름", day.label, (v) => { day.label = v; }, { placeholder: "예: 1일차" }),
         field("날짜", day.date, (v) => { day.date = v; }, { type: "date" }),
