@@ -19,7 +19,7 @@ const el = (tag, attrs = {}, children = []) => {
 };
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const rid = () => Math.random().toString(36).slice(2, 6);
-const EMOJIS = ["🏯", "🏛️", "🎢", "🏨", "🍚", "🏫", "🚌", "🌊", "⛰️", "🌳", "🎭", "📍"];
+const EMOJIS = ["🏯", "🏛️", "🎢", "🏨", "🍚", "🍱", "🏫", "🚌", "🚶", "🌊", "⛰️", "🌳", "🎭", "🛏️", "📸", "🎁", "📍"];
 
 export function createEditor(container, ctx) {
   // ctx: { data, updatedAt, source, onSaved(data, updatedAt) }
@@ -139,23 +139,46 @@ export function createEditor(container, ctx) {
       ]));
       card.append(el("label", { class: "muted small", style: "display:block;margin-top:6px;font-weight:700" }, "이 날의 순서"));
       (day.stops || []).forEach((stop, si) => {
+        const isCustom = !stop.placeId;
         const row = el("div", { class: "ed-item stop-item" });
         const timeInput = el("input", { class: "input", type: "time", value: stop.time || "", style: "width:140px", oninput: (e) => { stop.time = e.target.value; markDirty(); } });
-        const sel = el("select", { class: "input", style: "flex:1;min-width:150px" }, placeOptions.map(([v, txt]) => el("option", { value: v, selected: v === stop.placeId }, txt)));
-        sel.addEventListener("change", () => { stop.placeId = sel.value; markDirty(); });
-        row.append(timeInput, sel,
+        // 장소 목록에서 고르거나, "직접 입력"으로 아이콘+글자만 적는 항목(예: 🚌 버스 이동, 🍱 점심)
+        const sel = el("select", { class: "input", style: "flex:1;min-width:150px" }, [
+          ...placeOptions.map(([v, txt]) => el("option", { value: v, selected: v === stop.placeId }, txt)),
+          el("option", { value: "__custom", selected: isCustom }, "✏️ 직접 입력…"),
+        ]);
+        sel.addEventListener("change", () => {
+          if (sel.value === "__custom") { stop.placeId = null; stop.emoji = stop.emoji || "🚌"; stop.label = stop.label || ""; }
+          else { stop.placeId = sel.value; }
+          markDirty(); render();
+        });
+        row.append(timeInput, sel);
+        if (isCustom) {
+          const emojiSel = el("select", { class: "input", style: "width:80px" }, EMOJIS.map((e) => el("option", { value: e, selected: e === (stop.emoji || "🚌") }, e)));
+          emojiSel.addEventListener("change", () => { stop.emoji = emojiSel.value; markDirty(); });
+          const labelInput = el("input", { class: "input", placeholder: "예: 버스 이동, 점심 식사", value: stop.label || "", style: "flex:1;min-width:140px", oninput: (e) => { stop.label = e.target.value; markDirty(); } });
+          row.append(emojiSel, labelInput);
+        }
+        row.append(
           el("button", { class: "btn small ghost", "aria-label": "위로", onclick: () => { moveItem(day.stops, si, -1); markDirty(); render(); } }, "↑"),
           el("button", { class: "btn small ghost", "aria-label": "아래로", onclick: () => { moveItem(day.stops, si, 1); markDirty(); render(); } }, "↓"),
           el("button", { class: "btn small ghost", onclick: () => { day.stops.splice(si, 1); markDirty(); render(); } }, "삭제"));
         card.append(row);
       });
-      card.append(el("div", { class: "ed-actions" }, el("button", { class: "btn small", onclick: () => {
-        const first = placeOptions[0];
-        if (!first) { alert("먼저 장소를 추가해 주세요."); return; }
-        day.stops = day.stops || [];
-        day.stops.push({ placeId: first[0], time: "" });
-        markDirty(); render();
-      } }, "+ 일정 항목 추가")));
+      card.append(el("div", { class: "ed-actions" }, [
+        el("button", { class: "btn small", onclick: () => {
+          const first = placeOptions[0];
+          if (!first) { alert("먼저 장소를 추가해 주세요."); return; }
+          day.stops = day.stops || [];
+          day.stops.push({ placeId: first[0], time: "" });
+          markDirty(); render();
+        } }, "+ 장소 일정 추가"),
+        el("button", { class: "btn small", onclick: () => {
+          day.stops = day.stops || [];
+          day.stops.push({ placeId: null, emoji: "🚌", label: "", time: "" });
+          markDirty(); render();
+        } }, "+ 직접 입력 항목 추가"),
+      ]));
       wrap.append(card);
     });
     wrap.append(el("div", { class: "ed-actions" }, el("button", { class: "btn small", onclick: () => {
@@ -281,7 +304,10 @@ export function createEditor(container, ctx) {
         }
       }
     }
-    for (const d of draft.trip.days || []) for (const s of d.stops || []) if (!draft.places[s.placeId]) errs.push(`${d.label}: 없는 장소가 일정에 있습니다.`);
+    for (const d of draft.trip.days || []) for (const s of d.stops || []) {
+      if (!s.placeId && !(s.label || "").trim()) errs.push(`${d.label}: 직접 입력 항목의 내용을 적어 주세요.`);
+      if (s.placeId && !draft.places[s.placeId]) errs.push(`${d.label}: 없는 장소가 일정에 있습니다.`);
+    }
     return errs;
   }
   async function save(force = false) {

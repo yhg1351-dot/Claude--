@@ -332,7 +332,15 @@ function viewHome() {
     const tl = el("div", { class: "timeline" });
     for (const stop of day.stops) {
       const p = place(stop.placeId);
-      if (!p) continue;
+      if (!p) {
+        // 장소 없이 글자만 있는 일정 항목 (예: 🚌 버스 이동)
+        if (!stop.label) continue;
+        tl.append(el("div", { class: "stop info custom" }, [
+          el("div", { class: "emoji" }, stop.emoji || "📍"),
+          el("div", { class: "body" }, [el("div", { class: "name" }, stop.label), el("div", { class: "meta" }, stop.time || "")]),
+        ]));
+        continue;
+      }
       const isMission = p.type === "mission";
       const pr = isMission ? placeProgress(stop.placeId) : null;
       const complete = isMission && pr.total > 0 && pr.done === pr.total;
