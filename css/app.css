@@ -289,3 +289,8 @@ table.grid tr:last-child td { border-bottom: 0; }
 .opt-row input[type=radio] { width: 20px; height: 20px; }
 .opt-row .input { flex: 1; }
 .badge-src { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: #ece8df; color: var(--muted); }
+.editor .card.focus { box-shadow: 0 0 0 3px var(--gold), var(--shadow); transition: box-shadow .4s; }
+.place-jump { display: flex; gap: 6px; align-items: center; overflow-x: auto; padding: 4px 0 6px; scrollbar-width: none; }
+.place-jump::-webkit-scrollbar { display: none; }
+.place-jump .chip.jump { border: 0; cursor: pointer; flex: none; }
+.place-jump .chip.jump:active { background: var(--gold-soft); color: var(--gold-deep); }

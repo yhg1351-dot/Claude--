@@ -30,6 +30,7 @@ export function createEditor(container, ctx) {
   let saving = false;
   let statusText = "";
   let tab = "basics"; // basics | schedule | places
+  let focusPlaceId = null; // 장소 탭으로 이동할 때 강조할 장소
 
   const markDirty = () => { dirty = true; renderToolbarStatus(); };
   const placeList = () => Object.entries(draft.places);
@@ -164,6 +165,17 @@ export function createEditor(container, ctx) {
           emojiSel.addEventListener("change", () => { stop.emoji = emojiSel.value; markDirty(); });
           const labelInput = el("input", { class: "input", placeholder: "예: 버스 이동, 점심 식사", value: stop.label || "", style: "flex:1;min-width:140px", oninput: (e) => { stop.label = e.target.value; markDirty(); } });
           row.append(emojiSel, labelInput);
+          // 안내문·이미지·미션을 붙이려면 장소로 바꾼다
+          row.append(el("button", { class: "btn small", title: "이 항목을 장소로 바꾸고 안내문·이미지·미션을 붙입니다", onclick: () => {
+            const name = (stop.label || "").trim();
+            if (!name) { alert("먼저 항목 이름을 적어 주세요."); return; }
+            const id = uniqueId("place");
+            draft.places[id] = { name, emoji: stop.emoji || "📍", type: "info", intro: "" };
+            stop.placeId = id; delete stop.label; delete stop.emoji;
+            markDirty(); goToPlace(id);
+          } }, "안내·미션 추가"));
+        } else {
+          row.append(el("button", { class: "btn small ghost", title: "이 장소의 안내문·이미지·미션 편집으로 이동", onclick: () => goToPlace(stop.placeId) }, "내용 편집 →"));
         }
         row.append(el("div", { class: "stop-actions" }, [
           el("button", { class: "btn small ghost", "aria-label": "위로", onclick: () => { moveItem(day.stops, si, -1); markDirty(); render(); } }, "↑"),
@@ -250,7 +262,7 @@ export function createEditor(container, ctx) {
     const wrap = el("div", {});
     wrap.append(el("h2", { class: "mission-section" }, "장소와 미션"));
     placeList().forEach(([id, p]) => {
-      const card = el("div", { class: "card" });
+      const card = el("div", { class: `card ${focusPlaceId === id ? "focus" : ""}`, "data-place-id": id });
       card.append(el("h2", {}, [`${p.emoji || ""} ${p.name || "(이름 없음)"}`, el("span", { class: "sp" }),
         el("button", { class: "btn small ghost", title: "저장소의 기본 파일(data/missions.json)에 있는 이 장소의 내용으로 바꿉니다", onclick: async () => {
           const def = await loadDefaultData();
@@ -294,6 +306,20 @@ export function createEditor(container, ctx) {
       setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }), 50);
     } }, "+ 장소 추가")));
     return wrap;
+  }
+  function scrollToPlace(id) {
+    const card = container.querySelector(`[data-place-id="${id}"]`);
+    if (!card) return;
+    const bar = container.querySelector(".ed-toolbar");
+    const offset = (bar ? bar.getBoundingClientRect().bottom : 0) + 8;
+    window.scrollTo({ top: card.getBoundingClientRect().top + window.scrollY - offset, behavior: "smooth" });
+    card.classList.add("focus");
+    setTimeout(() => card.classList.remove("focus"), 2000);
+  }
+  function goToPlace(id) {
+    tab = "places"; focusPlaceId = id; render();
+    setTimeout(() => scrollToPlace(id), 50);
+    setTimeout(() => { focusPlaceId = null; }, 2500);
   }
   function addMission(p, type) {
     p.missions = p.missions || [];
@@ -366,13 +392,21 @@ export function createEditor(container, ctx) {
     container.className = "editor";
     const saveBtn = el("button", { class: "btn small gold", onclick: () => save(false) }, "저장");
     const subtabs = [["basics", "기본 정보"], ["schedule", "일정"], ["places", "장소와 미션"]];
-    container.append(el("div", { class: "ed-toolbar" }, [
+    const toolbar = el("div", { class: "ed-toolbar" }, [
       el("div", { class: "tabs" }, subtabs.map(([k, l]) => el("button", { class: k === tab ? "active" : "", onclick: () => { tab = k; render(); window.scrollTo({ top: 0 }); } }, l))),
       el("div", { class: "ed-toolbar-row" }, [
         toolbarStatus, saveBtn,
         el("button", { class: "btn small ghost", onclick: resetToDefault }, "기본 파일로 되돌리기"),
       ]),
-    ]));
+    ]);
+    // 장소와 미션 탭: 장소 바로가기 칩 (누르면 그 장소 카드로 스크롤)
+    if (tab === "places" && placeList().length) {
+      toolbar.append(el("div", { class: "place-jump" }, [
+        el("span", { class: "muted small", style: "flex:none" }, "바로가기"),
+        ...placeList().map(([id, p]) => el("button", { class: "chip gray jump", onclick: () => scrollToPlace(id) }, `${p.emoji || ""} ${p.name || "(이름 없음)"}`)),
+      ]));
+    }
+    container.append(toolbar);
     renderToolbarStatus();
     container.append(el("p", { class: "muted small" }, `장소 ${placeList().length}곳 · 미션 ${missionCount()}개. 고친 뒤 위의 "저장"을 눌러야 학생 앱에 반영됩니다.`));
     if (tab === "basics") container.append(sectionBasics());
