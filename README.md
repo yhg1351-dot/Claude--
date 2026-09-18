@@ -21,7 +21,9 @@
 
 ## 1. 미션 내용 수정
 
-`data/missions.json` 파일 하나에 일정, 반/모둠 수, 장소별 미션이 들어 있습니다.
+**교사 화면 → 편집 탭**에서 일정(날짜·시간·순서), 장소(이름·아이콘·안내문·안내 이미지), 미션(퀴즈·글·사진), 반/모둠 수를 고치고 "저장"을 누르면 학생 앱에 바로 반영됩니다. 편집 내용은 Supabase에 저장되며, 아래 `supabase/add-editor.sql`을 한 번 실행해 두어야 합니다.
+
+서버에 저장된 편집본이 없을 때는 `data/missions.json` 파일의 내용을 사용합니다. 이 파일에는 일정, 반/모둠 수, 장소별 미션이 들어 있습니다.
 GitHub 웹에서 파일을 열어 연필 아이콘으로 수정하고 저장(Commit)하면 1~2분 뒤 앱에 반영됩니다.
 
 - 미션 유형: `choice`(객관식, `options`와 정답 번호 `answer`는 0부터), `text`(짧은 글), `photo`(사진, `maxPhotos`와 설명 요청 `caption`)
@@ -41,7 +43,7 @@ Supabase 값을 넣기 전까지 앱은 **데모 모드**로 동작합니다. �
 (교사 화면 비밀번호는 `js/config.js`의 `localTeacherPassword`, 기본값 `1234`)
 
 1. [supabase.com](https://supabase.com)에서 무료 프로젝트를 만듭니다. (Region: Northeast Asia (Seoul) 권장)
-2. **SQL Editor**에 `supabase/schema.sql` 내용을 전부 붙여넣고 **Run** 합니다. (여러 번 실행해도 안전)
+2. **SQL Editor**에 `supabase/schema.sql` 내용을 전부 붙여넣고 **Run** 합니다. (여러 번 실행해도 안전. 이미 실행한 프로젝트에 편집 기능만 추가하려면 `supabase/add-editor.sql`만 실행)
 3. **Authentication → Users → Add user**로 교사 계정(이메일/비밀번호)을 만듭니다. "Auto Confirm User"를 켭니다. 교사 19명이 공용 계정 하나를 써도 되고 각자 만들어도 됩니다.
    - 그 이메일을 `js/config.js`의 `teacherEmail`에 넣으면 교사 화면에서 비밀번호("교사 코드")만 입력하면 됩니다. 비밀번호는 6자 이상이어야 하며, Authentication → Users에서 언제든 바꿀 수 있습니다.
 4. **Project Settings → API**에서 `Project URL`과 `anon public` 키를 복사해 `js/config.js`에 넣습니다.

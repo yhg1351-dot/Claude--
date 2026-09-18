@@ -1,5 +1,7 @@
 // 교사 확인 화면: 로그인 후 제출 현황, 답변과 사진, 접속 해제, CSV 내려받기, 전체 삭제.
 import { backend, isConfigured } from "./backend.js";
+import { loadTripData } from "./data.js";
+import { createEditor } from "./editor.js";
 
 const CFG = window.APP_CONFIG || {};
 const $ = (s, r = document) => r.querySelector(s);
@@ -105,6 +107,20 @@ function render() {
   else if (state.tab === "byPlace") app.append(viewByPlace());
   else if (state.tab === "byGroup") app.append(viewByGroup());
   else if (state.tab === "tools") app.append(viewTools());
+  else if (state.tab === "edit") app.append(viewEdit());
+}
+
+// 편집 탭: 화면을 다시 그려도 편집 중인 내용이 남도록 컨테이너를 재사용
+let editorBox = null;
+function viewEdit() {
+  if (!editorBox) {
+    editorBox = el("div");
+    createEditor(editorBox, {
+      data: state.data, updatedAt: state.dataUpdatedAt, source: state.dataSource,
+      onSaved: (data, updatedAt) => { state.data = data; state.dataUpdatedAt = updatedAt; state.dataSource = "server"; },
+    });
+  }
+  return editorBox;
 }
 
 function viewLogin() {
@@ -141,7 +157,7 @@ function viewLogin() {
 }
 
 function viewHeader() {
-  const tabs = [["overview", "현황"], ["byPlace", "장소별 제출"], ["byGroup", "모둠별 제출"], ["tools", "도구"]];
+  const tabs = [["overview", "현황"], ["byPlace", "장소별 제출"], ["byGroup", "모둠별 제출"], ["edit", "편집"], ["tools", "도구"]];
   return el("div", {}, [
     el("div", { class: "teacher-top" }, [
       el("h1", {}, "교사 확인 화면"),
@@ -419,8 +435,8 @@ function downloadCsv() {
 
 // ------------------------------------------------------------ 시작
 async function init() {
-  const res = await fetch(`./data/missions.json?v=${encodeURIComponent(CFG.version || "1")}`, { cache: "no-cache" });
-  state.data = await res.json();
+  const loaded = await loadTripData();
+  state.data = loaded.data; state.dataUpdatedAt = loaded.updatedAt; state.dataSource = loaded.source;
   state.loggedIn = await backend.teacherSession();
   render();
   if (state.loggedIn) { load(); startAutoRefresh(); }

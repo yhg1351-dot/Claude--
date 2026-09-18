@@ -252,3 +252,28 @@ table.grid tr:last-child td { border-bottom: 0; }
 .lightbox img { max-width: 96vw; max-height: 84vh; object-fit: contain; border-radius: 6px; }
 .lightbox .lb-bar { position: fixed; left: 0; right: 0; bottom: calc(14px + var(--safe-b)); display: flex; gap: 10px; justify-content: center; }
 .mission-section { margin: 18px 0 8px; font-size: 15px; font-weight: 800; color: var(--ink-2); }
+
+/* ---------- 이미지 카드 ---------- */
+.img-card { padding: 0; overflow: hidden; }
+.img-card img { display: block; width: 100%; max-height: 320px; object-fit: cover; border-radius: var(--radius); }
+
+/* ---------- 교사 편집 화면 ---------- */
+.editor .card h2 { display: flex; align-items: center; gap: 8px; }
+.editor .card h2 .sp { flex: 1; }
+.ed-row { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 8px 0; }
+@media (min-width: 720px) { .ed-row.two { grid-template-columns: 1fr 1fr; } .ed-row.three { grid-template-columns: 1fr 1fr 1fr; } }
+.ed-row label { font-size: 13px; font-weight: 700; color: var(--ink-2); display: block; margin-bottom: 4px; }
+.ed-row .input { min-height: 44px; padding: 8px 12px; }
+.ed-row textarea.input { min-height: 80px; }
+.ed-item { border: 1.5px solid var(--line); border-radius: var(--radius-sm); padding: 12px; margin: 10px 0; background: #fffdf8; }
+.ed-item.stop-item { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 10px; }
+.ed-item.stop-item select, .ed-item.stop-item input { min-height: 40px; }
+.ed-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.ed-actions .btn.small { min-height: 34px; }
+.ed-toolbar { position: sticky; top: 52px; z-index: 4; background: var(--bg); padding: 8px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ed-toolbar .status { font-size: 13px; color: var(--muted); flex: 1; }
+.ed-thumb { width: 120px; height: 80px; object-fit: cover; border-radius: 8px; background: #ece8df; display: block; }
+.opt-row { display: flex; gap: 6px; align-items: center; margin: 6px 0; }
+.opt-row input[type=radio] { width: 20px; height: 20px; }
+.opt-row .input { flex: 1; }
+.badge-src { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: #ece8df; color: var(--muted); }

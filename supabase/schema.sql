@@ -228,3 +228,30 @@ drop policy if exists teacher_read_photos on storage.objects;
 create policy teacher_read_photos on storage.objects for select to authenticated using (bucket_id = 'photos');
 drop policy if exists teacher_delete_photos on storage.objects;
 create policy teacher_delete_photos on storage.objects for delete to authenticated using (bucket_id = 'photos');
+
+-- ---------------------------------------------------------------- 교사 편집용 설정 저장 (일정·장소·미션)
+create table if not exists public.app_config (
+  id          text primary key,
+  data        jsonb not null,
+  updated_at  timestamptz not null default now()
+);
+alter table public.app_config enable row level security;
+drop policy if exists anyone_read_config on public.app_config;
+create policy anyone_read_config on public.app_config for select to anon, authenticated using (true);
+drop policy if exists teacher_insert_config on public.app_config;
+create policy teacher_insert_config on public.app_config for insert to authenticated with check (true);
+drop policy if exists teacher_update_config on public.app_config;
+create policy teacher_update_config on public.app_config for update to authenticated using (true) with check (true);
+
+-- 안내 이미지용 공개 사진함 (학생이 로그인 없이 볼 수 있어야 하므로 public). 올리기·지우기는 교사만.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('assets', 'assets', true, 3145728, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update set public = true, file_size_limit = 3145728, allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp'];
+drop policy if exists anyone_read_assets on storage.objects;
+create policy anyone_read_assets on storage.objects for select to anon, authenticated using (bucket_id = 'assets');
+drop policy if exists teacher_write_assets on storage.objects;
+create policy teacher_write_assets on storage.objects for insert to authenticated with check (bucket_id = 'assets');
+drop policy if exists teacher_update_assets on storage.objects;
+create policy teacher_update_assets on storage.objects for update to authenticated using (bucket_id = 'assets') with check (bucket_id = 'assets');
+drop policy if exists teacher_delete_assets on storage.objects;
+create policy teacher_delete_assets on storage.objects for delete to authenticated using (bucket_id = 'assets');

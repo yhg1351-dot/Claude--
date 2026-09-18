@@ -69,6 +69,43 @@ function makeSupabase() {
         p_photo_paths: s.photoPaths || [],
       }),
 
+    // ----- 일정·미션 설정 (교사가 편집, 학생은 읽기만)
+    async loadConfig() {
+      try {
+        const { data, error } = await client.from("app_config").select("data, updated_at").eq("id", "trip").maybeSingle();
+        if (error) return { ok: false, reason: "network", message: error.message };
+        if (!data) return { ok: true, data: null, updatedAt: null };
+        return { ok: true, data: data.data, updatedAt: data.updated_at };
+      } catch (e) {
+        return netErr(e);
+      }
+    },
+    async saveConfig(data, expectedUpdatedAt) {
+      try {
+        // 다른 교사가 먼저 저장했는지 확인 (마지막 저장 시각 비교)
+        const cur = await client.from("app_config").select("updated_at").eq("id", "trip").maybeSingle();
+        if (cur.error) return { ok: false, reason: "network", message: cur.error.message };
+        if (cur.data && expectedUpdatedAt && cur.data.updated_at !== expectedUpdatedAt) return { ok: false, reason: "conflict" };
+        const now = new Date().toISOString();
+        const { error } = await client.from("app_config").upsert({ id: "trip", data, updated_at: now });
+        if (error) return { ok: false, reason: "network", message: error.message };
+        const after = await client.from("app_config").select("updated_at").eq("id", "trip").maybeSingle();
+        return { ok: true, updatedAt: after.data ? after.data.updated_at : now };
+      } catch (e) {
+        return netErr(e);
+      }
+    },
+    async uploadAsset(path, blob) {
+      try {
+        const { error } = await client.storage.from("assets").upload(path, blob, { contentType: blob.type || "image/jpeg", upsert: true });
+        if (error) return { ok: false, reason: "network", message: error.message };
+        const { data } = client.storage.from("assets").getPublicUrl(path);
+        return { ok: true, url: data.publicUrl };
+      } catch (e) {
+        return netErr(e);
+      }
+    },
+
     // ----- 교사용
     async teacherLogin(email, password) {
       try {
@@ -204,6 +241,22 @@ function makeLocal() {
         updated_at: new Date().toISOString(),
       });
       return { ok: true };
+    },
+
+    // ----- 설정 (데모: 이 브라우저에만 저장)
+    async loadConfig() {
+      const row = ls.get("mq-local-config");
+      return { ok: true, data: row ? row.data : null, updatedAt: row ? row.updatedAt : null };
+    },
+    async saveConfig(data) {
+      const updatedAt = new Date().toISOString();
+      ls.set("mq-local-config", { data, updatedAt });
+      return { ok: true, updatedAt };
+    },
+    async uploadAsset(_path, blob) {
+      // 데모 모드: 이미지를 글자(data URL)로 바꿔 설정 안에 넣는다
+      const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
+      return { ok: true, url };
     },
 
     // ----- 교사용

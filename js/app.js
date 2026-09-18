@@ -3,6 +3,7 @@ import { store, ls, uuid } from "./store.js";
 import { backend, isConfigured } from "./backend.js";
 import { compressImage } from "./image.js";
 import { enqueue, pending, onSync, startSyncLoop, resumeAfterLogin, kick, retryNow } from "./sync.js";
+import { loadTripData } from "./data.js";
 
 const CFG = window.APP_CONFIG || {};
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -397,6 +398,7 @@ function viewPlace(placeId) {
     el("div", { class: "emoji" }, p.emoji || "📍"),
     el("div", {}, [el("div", { class: "t" }, p.name), el("div", { class: "d" }, ms.length ? `미션 ${ms.length}개` : "안내")]),
   ]));
+  if (p.image) wrap.append(el("div", { class: "card img-card" }, el("img", { src: p.image, alt: p.name, loading: "lazy" })));
   if (p.intro) wrap.append(el("div", { class: "card" }, el("p", { class: "intro" }, p.intro)));
   if (!ms.length) return wrap;
   const pr = placeProgress(placeId);
@@ -439,6 +441,7 @@ function viewMission(placeId, missionId) {
   card.append(el("h2", {}, m.title));
   if (m.where) card.append(el("div", { class: "where" }, [el("span", {}, "📍"), el("span", {}, [el("strong", {}, "어디서 "), m.where])]));
   if (prev) card.append(el("div", { class: `notice ${prev.status === "sent" ? "ok" : "warn"}` }, prev.status === "sent" ? "✓ 제출 완료! 다시 제출하면 새 내용으로 바뀌어요." : "⏳ 저장됨. 인터넷이 연결되면 자동으로 보내요. 다시 제출하면 새 내용으로 바뀌어요."));
+  if (m.image) card.append(el("div", { class: "img-card", style: "margin:10px 0" }, el("img", { src: m.image, alt: "미션 사진", loading: "lazy" })));
   card.append(el("div", { class: "question" }, m.question || ""));
   if (m.hint) card.append(el("details", { class: "hint" }, [el("summary", {}, "힌트 보기"), el("p", {}, m.hint)]));
 
@@ -593,8 +596,7 @@ async function refreshPending() {
 // ------------------------------------------------------------ 시작
 async function init() {
   try {
-    const res = await fetch(`./data/missions.json?v=${encodeURIComponent(CFG.version || "1")}`, { cache: "no-cache" });
-    state.data = await res.json();
+    state.data = (await loadTripData()).data;
   } catch (e) {
     // 캐시된 파일이 없고 오프라인이면 안내
     root().innerHTML = '<div class="card"><h2>미션 정보를 불러오지 못했어요</h2><p class="muted">인터넷이 연결된 곳에서 다시 열어 주세요.</p></div>';
@@ -620,6 +622,14 @@ async function init() {
   window.addEventListener("online", () => { state.online = true; renderStatus(); });
   window.addEventListener("offline", () => { state.online = false; renderStatus(); });
   window.addEventListener("hashchange", render);
+  // 교사가 일정·미션을 고치면 앱이 다시 보일 때 새로 받아온다
+  document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState !== "visible" || !navigator.onLine) return;
+    try {
+      const r = await loadTripData();
+      if (JSON.stringify(r.data) !== JSON.stringify(state.data)) { state.data = r.data; render(); }
+    } catch (e) {}
+  });
 
   render();
   await refreshPending();
