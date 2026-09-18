@@ -187,16 +187,12 @@ export function createEditor(container, ctx) {
       card.append(el("div", { class: "ed-actions" }, [
         el("button", { class: "btn small", onclick: () => {
           const first = placeOptions[0];
-          if (!first) { alert("먼저 장소를 추가해 주세요."); return; }
           day.stops = day.stops || [];
-          day.stops.push({ placeId: first[0], time: "" });
+          // 장소가 있으면 첫 장소로, 없으면 직접 입력 항목으로 시작 (드롭다운에서 언제든 바꿀 수 있음)
+          day.stops.push(first ? { placeId: first[0], time: "" } : { placeId: null, emoji: "🚌", label: "", time: "" });
           markDirty(); render();
-        } }, "+ 장소 일정 추가"),
-        el("button", { class: "btn small", onclick: () => {
-          day.stops = day.stops || [];
-          day.stops.push({ placeId: null, emoji: "🚌", label: "", time: "" });
-          markDirty(); render();
-        } }, "+ 직접 입력 항목 추가"),
+        } }, "+ 일정 항목 추가"),
+        el("span", { class: "muted small" }, "추가한 뒤 목록에서 장소를 고르거나 '직접 입력'을 선택하세요."),
       ]));
       wrap.append(card);
     });
