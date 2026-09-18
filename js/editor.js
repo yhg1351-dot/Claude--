@@ -1,7 +1,7 @@
 // 교사용 편집 화면: 일정 · 장소 · 미션 · 반/모둠 수를 고치고 서버에 저장한다.
 import { backend } from "./backend.js";
 import { compressImage } from "./image.js";
-import { loadDefaultData } from "./data.js";
+import { loadDefaultData, orderedPlaceIds } from "./data.js";
 
 const el = (tag, attrs = {}, children = []) => {
   const n = document.createElement(tag);
@@ -33,7 +33,7 @@ export function createEditor(container, ctx) {
   let focusPlaceId = null; // 장소 탭으로 이동할 때 강조할 장소
 
   const markDirty = () => { dirty = true; renderToolbarStatus(); };
-  const placeList = () => Object.entries(draft.places);
+  const placeList = () => orderedPlaceIds(draft).map((id) => [id, draft.places[id]]);
   const missionCount = () => placeList().reduce((n, [, p]) => n + (p.missions || []).length, 0);
   const uniqueId = (prefix) => {
     let id;

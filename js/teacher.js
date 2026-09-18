@@ -1,6 +1,6 @@
 // 교사 확인 화면: 로그인 후 제출 현황, 답변과 사진, 접속 해제, CSV 내려받기, 전체 삭제.
 import { backend, isConfigured } from "./backend.js";
-import { loadTripData } from "./data.js";
+import { loadTripData, orderedPlaceIds } from "./data.js";
 import { createEditor } from "./editor.js";
 
 const CFG = window.APP_CONFIG || {};
@@ -41,7 +41,7 @@ function allGroupCodes() {
   return out;
 }
 function codeLabel(code) { return `${code[1]}반 ${parseInt(code.slice(2), 10)}모둠`; }
-function missionPlaces() { return Object.entries(state.data.places).filter(([, p]) => p.type === "mission"); }
+function missionPlaces() { return orderedPlaceIds(state.data).map((id) => [id, state.data.places[id]]).filter(([, p]) => p.type === "mission"); }
 function missionById(id) {
   for (const [pid, p] of missionPlaces()) for (const m of p.missions || []) if (m.id === id) return { ...m, placeId: pid, placeName: p.name };
   return null;
@@ -169,11 +169,11 @@ function viewHeader() {
       el("button", { class: "btn small ghost", onclick: async () => { await backend.teacherLogout(); state.loggedIn = false; render(); } }, "나가기"),
     ]),
     el("div", { class: "tabs" }, tabs.map(([k, l]) => el("button", { class: k === state.tab ? "active" : "", onclick: () => { state.tab = k; render(); } }, l))),
-    el("div", { class: "toolbar" }, [
-      el("label", { class: "muted small" }, "반: "),
-      el("select", { onchange: (e) => { state.classFilter = e.target.value; render(); } }, [
-        el("option", { value: "all", selected: state.classFilter === "all" ? "" : null }, "전체"),
-        ...state.data.trip.classes.map((c) => el("option", { value: String(c.class), selected: state.classFilter === String(c.class) ? "" : null }, `${c.class}반`)),
+    state.tab === "edit" ? null : el("div", { class: "toolbar class-picker" }, [
+      el("span", { class: "muted small" }, "반"),
+      el("div", { class: "tabs" }, [
+        el("button", { class: state.classFilter === "all" ? "active" : "", onclick: () => { state.classFilter = "all"; render(); } }, "전체"),
+        ...state.data.trip.classes.map((c) => el("button", { class: state.classFilter === String(c.class) ? "active" : "", onclick: () => { state.classFilter = String(c.class); render(); } }, `${c.class}반`)),
       ]),
     ]),
   ]);

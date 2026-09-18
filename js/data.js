@@ -32,3 +32,17 @@ export async function loadTripData({ preferServer = true } = {}) {
   if (cached && cached.data && cached.data.trip) return { data: cached.data, source: "cache", updatedAt: cached.updatedAt };
   return { data: await loadDefaultData(), source: "default", updatedAt: null };
 }
+
+// 장소를 일정 순서(날짜 → 순서)대로 정렬한 id 목록. 일정에 없는 장소는 뒤에 이름순으로.
+export function orderedPlaceIds(data) {
+  const out = [];
+  const seen = new Set();
+  for (const d of (data.trip && data.trip.days) || []) {
+    for (const st of d.stops || []) {
+      if (st.placeId && data.places[st.placeId] && !seen.has(st.placeId)) { seen.add(st.placeId); out.push(st.placeId); }
+    }
+  }
+  const rest = Object.keys(data.places || {}).filter((id) => !seen.has(id));
+  rest.sort((a, b) => String(data.places[a].name || "").localeCompare(String(data.places[b].name || ""), "ko"));
+  return out.concat(rest);
+}

@@ -294,3 +294,6 @@ table.grid tr:last-child td { border-bottom: 0; }
 .place-jump::-webkit-scrollbar { display: none; }
 .place-jump .chip.jump { border: 0; cursor: pointer; flex: none; }
 .place-jump .chip.jump:active { background: var(--gold-soft); color: var(--gold-deep); }
+.class-picker { gap: 6px; }
+.class-picker .tabs { flex: 1; padding: 0; }
+.class-picker .tabs button { padding: 7px 12px; }
