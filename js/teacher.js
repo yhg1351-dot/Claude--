@@ -164,9 +164,9 @@ function viewHeader() {
   return el("div", { class: "teacher-head" }, [
     el("div", { class: "teacher-top" }, [
       el("h1", {}, "교사 확인 화면"),
-      el("span", { class: "muted small" }, state.loadedAt ? `${fmtTime(state.loadedAt.toISOString())} 갱신` : ""),
-      el("button", { class: "btn small", onclick: load, "aria-label": "새로고침" }, "↻"),
-      el("button", { class: "btn small ghost", onclick: async () => { await backend.teacherLogout(); state.loggedIn = false; render(); } }, "나가기"),
+      el("span", { class: "stamp" }, state.loadedAt ? `${fmtTime(state.loadedAt.toISOString())} 갱신` : ""),
+      el("button", { class: "btn small icon", onclick: load, "aria-label": "새로고침", title: "새로고침" }, "↻"),
+      el("button", { class: "btn small", onclick: async () => { await backend.teacherLogout(); state.loggedIn = false; render(); } }, "나가기"),
     ]),
     el("div", { class: "tabs" }, tabs.map(([k, l]) => el("button", { class: k === state.tab ? "active" : "", onclick: () => { state.tab = k; render(); } }, l))),
     state.tab === "edit" ? null : el("div", { class: "toolbar class-picker" }, [
@@ -195,14 +195,14 @@ function viewOverview() {
     kpi(state.submissions.filter((s) => codes.includes(s.group_code)).length, `제출 건수 (최대 ${totalMissions * codes.length})`), kpi(photoCount, "사진 수"),
   ]));
 
-  const thead = el("tr", {}, [el("th", {}, "모둠"), el("th", {}, "접속"), ...places.map(([, p]) => el("th", {}, p.name)), el("th", {}, "최근 제출")]);
+  const thead = el("tr", {}, [el("th", {}, "모둠"), el("th", {}, "접속"), ...places.map(([, p]) => el("th", { class: "num" }, p.name)), el("th", {}, "최근 제출")]);
   const rows = codes.map((code) => {
     const s = sessByCode.get(code);
     const st = sessionStatus(s);
     const subs = subsFor(code);
     const last = subs.map((x) => x.updated_at || x.created_at).sort().pop();
     const releaseBtn = s && st.cls !== "gray"
-      ? el("button", { class: "btn small ghost", style: "margin-left:6px", onclick: async () => {
+      ? el("button", { class: "btn small ghost", onclick: async () => {
           if (!confirm(`${codeLabel(code)}의 접속을 해제할까요? 다른 휴대폰이 바로 이 코드로 들어올 수 있게 됩니다.`)) return;
           const r = await backend.releaseGroup(code);
           if (!r.ok) alert(`실패: ${r.message || ""}`); else load();
@@ -210,12 +210,12 @@ function viewOverview() {
       : null;
     return el("tr", {}, [
       el("td", {}, el("strong", {}, codeLabel(code))),
-      el("td", {}, [el("span", { class: `chip ${st.cls}` }, st.label), releaseBtn]),
+      el("td", { class: "conn" }, el("span", { class: "cell-conn" }, [el("span", { class: `chip ${st.cls}` }, st.label), releaseBtn])),
       ...places.map(([pid, p]) => {
         const total = (p.missions || []).length;
         const done = (p.missions || []).filter((m) => sm.has(`${code}:${m.id}`)).length;
         const cls = done === 0 ? "cell-none" : done === total ? "cell-ok" : "cell-partial";
-        return el("td", { class: cls }, `${done}/${total}`);
+        return el("td", { class: `num ${cls}` }, `${done}/${total}`);
       }),
       el("td", { class: "muted" }, last ? fmtTime(last) : "-"),
     ]);
@@ -342,13 +342,13 @@ function viewTools() {
   wrap.append(el("div", { class: "card" }, [
     el("h2", {}, "CSV 내려받기"),
     el("p", { class: "muted" }, "모든 제출 내용을 엑셀에서 열 수 있는 파일로 저장합니다. 사진은 파일 이름만 포함됩니다."),
-    el("button", { class: "btn", onclick: downloadCsv }, "CSV 내려받기"),
+    el("button", { class: "btn wide-auto", onclick: downloadCsv }, "CSV 내려받기"),
   ]));
   const codes = filteredCodes();
   const withPhotos = state.submissions.filter((s) => codes.includes(s.group_code) && (s.photo_paths || []).length);
   const photoTotal = withPhotos.reduce((n, s) => n + s.photo_paths.length, 0);
   const prog = el("div", { class: "muted small", style: "margin-top:8px" });
-  const zipBtn = el("button", { class: "btn", onclick: () => downloadZip(withPhotos, prog, zipBtn) }, `사진 ${photoTotal}장 ZIP으로 내려받기`);
+  const zipBtn = el("button", { class: "btn wide-auto", onclick: () => downloadZip(withPhotos, prog, zipBtn) }, `사진 ${photoTotal}장 ZIP으로 내려받기`);
   if (!photoTotal) zipBtn.disabled = true;
   wrap.append(el("div", { class: "card" }, [
     el("h2", {}, "사진 내려받기"),
@@ -359,7 +359,7 @@ function viewTools() {
   wrap.append(el("div", { class: "card" }, [
     el("h2", {}, "전체 삭제"),
     el("p", { class: "muted" }, "수학여행이 끝난 뒤 학생 답변, 사진, 접속 정보를 모두 지웁니다. 되돌릴 수 없습니다."),
-    el("button", { class: "btn danger", onclick: async () => {
+    el("button", { class: "btn danger wide-auto", onclick: async () => {
       const typed = prompt('정말 삭제하려면 "삭제"라고 입력하세요.');
       if (typed !== "삭제") return;
       const r = await backend.deleteAll();

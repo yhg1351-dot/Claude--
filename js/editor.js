@@ -110,7 +110,7 @@ export function createEditor(container, ctx) {
         el("input", { class: "input", type: "number", min: 1, max: 9, value: c.class, style: "width:80px", oninput: (e) => { c.class = Number(e.target.value); markDirty(); } }),
         el("span", { class: "muted small" }, "모둠 수"),
         el("input", { class: "input", type: "number", min: 1, max: 99, value: c.groups, style: "width:80px", oninput: (e) => { c.groups = Number(e.target.value); markDirty(); } }),
-        el("button", { class: "btn small ghost", onclick: () => { t.classes.splice(i, 1); markDirty(); render(); } }, "삭제"),
+        el("button", { class: "btn small ghost danger", onclick: () => { t.classes.splice(i, 1); markDirty(); render(); } }, "삭제"),
       ]));
     });
     card.append(list);
@@ -130,11 +130,11 @@ export function createEditor(container, ctx) {
     const placeOptions = placeList().map(([id, p]) => [id, `${p.emoji || ""} ${p.name}`]);
     (t.days || []).forEach((day, di) => {
       const card = el("div", { class: "card", "data-jump-id": `day-${di}` });
-      card.append(el("h2", {}, [day.label || `${day.day}일차`, el("span", { class: "sp" }),
-        el("div", { class: "stop-actions" }, [
-          el("button", { class: "btn small ghost", "aria-label": "위로", disabled: di === 0, onclick: () => { moveItem(t.days, di, -1); markDirty(); render(); } }, "↑"),
-          el("button", { class: "btn small ghost", "aria-label": "아래로", disabled: di === t.days.length - 1, onclick: () => { moveItem(t.days, di, 1); markDirty(); render(); } }, "↓"),
-          el("button", { class: "btn small ghost", onclick: () => {
+      card.append(el("h2", {}, [el("span", { class: "ttl" }, day.label || `${day.day}일차`), el("span", { class: "sp" }),
+        el("div", { class: "card-actions" }, [
+          el("button", { class: "btn small ghost icon", "aria-label": "위로", disabled: di === 0, onclick: () => { moveItem(t.days, di, -1); markDirty(); render(); } }, "↑"),
+          el("button", { class: "btn small ghost icon", "aria-label": "아래로", disabled: di === t.days.length - 1, onclick: () => { moveItem(t.days, di, 1); markDirty(); render(); } }, "↓"),
+          el("button", { class: "btn small ghost danger", onclick: () => {
             if (!confirm(`${day.label || day.day + "일차"} 전체를 삭제할까요?`)) return;
             t.days.splice(di, 1); markDirty(); render();
           } }, "날짜 삭제"),
@@ -178,9 +178,9 @@ export function createEditor(container, ctx) {
           row.append(el("button", { class: "btn small ghost", title: "이 장소의 안내문·이미지·미션 편집으로 이동", onclick: () => goToPlace(stop.placeId) }, "내용 편집 →"));
         }
         row.append(el("div", { class: "stop-actions" }, [
-          el("button", { class: "btn small ghost", "aria-label": "위로", onclick: () => { moveItem(day.stops, si, -1); markDirty(); render(); } }, "↑"),
-          el("button", { class: "btn small ghost", "aria-label": "아래로", onclick: () => { moveItem(day.stops, si, 1); markDirty(); render(); } }, "↓"),
-          el("button", { class: "btn small ghost", onclick: () => { day.stops.splice(si, 1); markDirty(); render(); } }, "삭제"),
+          el("button", { class: "btn small ghost icon", "aria-label": "위로", onclick: () => { moveItem(day.stops, si, -1); markDirty(); render(); } }, "↑"),
+          el("button", { class: "btn small ghost icon", "aria-label": "아래로", onclick: () => { moveItem(day.stops, si, 1); markDirty(); render(); } }, "↓"),
+          el("button", { class: "btn small ghost danger", onclick: () => { day.stops.splice(si, 1); markDirty(); render(); } }, "삭제"),
         ]));
         card.append(row);
       });
@@ -211,10 +211,10 @@ export function createEditor(container, ctx) {
     const typeLabel = { choice: "🔘 퀴즈(객관식)", text: "✏️ 생각 쓰기", photo: "📷 사진 미션" };
     card.append(el("div", { class: "row", style: "align-items:center" }, [
       el("strong", {}, `${mi + 1}. ${typeLabel[m.type] || m.type}`),
-      el("div", { class: "ed-actions", style: "margin:0;justify-content:flex-end" }, [
-        el("button", { class: "btn small ghost", onclick: () => { moveItem(p.missions, mi, -1); markDirty(); render(); } }, "↑"),
-        el("button", { class: "btn small ghost", onclick: () => { moveItem(p.missions, mi, 1); markDirty(); render(); } }, "↓"),
-        el("button", { class: "btn small ghost", onclick: () => { if (confirm(`"${m.title}" 미션을 삭제할까요?`)) { p.missions.splice(mi, 1); markDirty(); render(); } } }, "삭제"),
+      el("div", { class: "card-actions", style: "margin-left:auto;flex:none" }, [
+        el("button", { class: "btn small ghost icon", "aria-label": "위로", onclick: () => { moveItem(p.missions, mi, -1); markDirty(); render(); } }, "↑"),
+        el("button", { class: "btn small ghost icon", "aria-label": "아래로", onclick: () => { moveItem(p.missions, mi, 1); markDirty(); render(); } }, "↓"),
+        el("button", { class: "btn small ghost danger", onclick: () => { if (confirm(`"${m.title}" 미션을 삭제할까요?`)) { p.missions.splice(mi, 1); markDirty(); render(); } } }, "삭제"),
       ]),
     ]));
     card.append(el("div", { class: "ed-row two" }, [
@@ -238,7 +238,7 @@ export function createEditor(container, ctx) {
         box.append(el("div", { class: "opt-row" }, [
           el("input", { type: "radio", name: `ans-${m.id}`, checked: m.answer === oi, onchange: () => { m.answer = oi; markDirty(); } }),
           el("input", { class: "input", value: opt, placeholder: `보기 ${oi + 1}`, oninput: (e) => { m.options[oi] = e.target.value; markDirty(); } }),
-          el("button", { class: "btn small ghost", onclick: () => { m.options.splice(oi, 1); if (m.answer >= m.options.length) m.answer = 0; markDirty(); render(); } }, "✕"),
+          el("button", { class: "btn small ghost danger icon", "aria-label": "보기 삭제", onclick: () => { m.options.splice(oi, 1); if (m.answer >= m.options.length) m.answer = 0; markDirty(); render(); } }, "✕"),
         ]));
       });
       box.append(el("div", { class: "ed-actions" }, el("button", { class: "btn small", onclick: () => { m.options.push(""); markDirty(); render(); } }, "+ 보기 추가")));
@@ -259,7 +259,9 @@ export function createEditor(container, ctx) {
     wrap.append(el("h2", { class: "mission-section" }, "장소와 미션"));
     placeList().forEach(([id, p]) => {
       const card = el("div", { class: `card ${focusPlaceId === id ? "focus" : ""}`, "data-place-id": id });
-      card.append(el("h2", {}, [`${p.emoji || ""} ${p.name || "(이름 없음)"}`, el("span", { class: "sp" }),
+      const placeActions = el("div", { class: "card-actions" });
+      card.append(el("h2", {}, [el("span", { class: "ttl" }, `${p.emoji || ""} ${p.name || "(이름 없음)"}`), el("span", { class: "sp" }), placeActions]));
+      placeActions.append(
         el("button", { class: "btn small ghost", title: "저장소의 기본 파일(data/missions.json)에 있는 이 장소의 내용으로 바꿉니다", onclick: async () => {
           const def = await loadDefaultData();
           const dp = def.places && def.places[id];
@@ -268,13 +270,13 @@ export function createEditor(container, ctx) {
           draft.places[id] = clone(dp);
           markDirty(); render();
         } }, "기본 파일에서 가져오기"),
-        el("button", { class: "btn small ghost", onclick: () => {
+        el("button", { class: "btn small ghost danger", onclick: () => {
         const used = (draft.trip.days || []).some((d) => (d.stops || []).some((s) => s.placeId === id));
         if (!confirm(`"${p.name}" 장소를 삭제할까요?${used ? " 일정에서도 함께 빠집니다." : ""}`)) return;
         delete draft.places[id];
         for (const d of draft.trip.days || []) d.stops = (d.stops || []).filter((s) => s.placeId !== id);
         markDirty(); render();
-      } }, "장소 삭제")]));
+      } }, "장소 삭제"));
       card.append(el("div", { class: "ed-row three" }, [
         field("이름", p.name, (v) => { p.name = v; }),
         select("아이콘", p.emoji || "📍", EMOJIS.map((e) => [e, e]), (v) => { p.emoji = v; }),
@@ -398,11 +400,14 @@ export function createEditor(container, ctx) {
     const saveBtn = el("button", { class: "btn small gold", onclick: () => save(false) }, "저장");
     const subtabs = [["basics", "기본 정보"], ["schedule", "일정"], ["places", "장소와 미션"]];
     const toolbar = el("div", { class: "ed-toolbar" }, [
-      el("div", { class: "tabs" }, subtabs.map(([k, l]) => el("button", { class: k === tab ? "active" : "", onclick: () => { tab = k; render(); window.scrollTo({ top: 0 }); } }, l))),
-      el("div", { class: "ed-toolbar-row" }, [
-        toolbarStatus, saveBtn,
-        el("button", { class: "btn small ghost", onclick: resetToDefault }, "기본 파일로 되돌리기"),
+      el("div", { class: "ed-toolbar-top" }, [
+        el("div", { class: "tabs" }, subtabs.map(([k, l]) => el("button", { class: k === tab ? "active" : "", onclick: () => { tab = k; render(); window.scrollTo({ top: 0 }); } }, l))),
+        el("div", { class: "actions" }, [
+          el("button", { class: "btn small ghost", onclick: resetToDefault }, "기본 파일로 되돌리기"),
+          saveBtn,
+        ]),
       ]),
+      toolbarStatus,
     ]);
     // 일정 탭: 날짜 바로가기 칩
     if (tab === "schedule" && (draft.trip.days || []).length) {
