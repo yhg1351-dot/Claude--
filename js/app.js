@@ -406,10 +406,11 @@ function viewRepCard() {
   ]);
 }
 async function becomeRep(btn) {
+  const label = btn ? btn.textContent : "";
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>'; }
   const r = await claimRep();
   if (r.ok) { toast("이 폰이 우리 모둠 대표 폰이 되었어요!", "ok"); render(); return; }
-  if (btn) { btn.disabled = false; btn.textContent = "우리 모둠 대표 폰으로 정하기"; }
+  if (btn) { btn.disabled = false; btn.textContent = label; }
   if (r.reason === "in_use") {
     await modal({
       title: "이미 대표 폰이 있어요",
