@@ -324,3 +324,9 @@ table.grid tr:last-child td { border-bottom: 0; }
 .editor .card > h2 { flex-wrap: wrap; }
 .editor .card > h2 .ttl { flex: 1 1 auto; min-width: 140px; }
 .editor .card > h2 .sp { display: none; }
+
+/* ---------- 대표 폰 상태 ---------- */
+.rep-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--indigo-soft); margin: 10px 0 4px; flex-wrap: wrap; }
+.rep-bar.rep { background: var(--gold-soft); color: #5a4200; font-weight: 700; }
+.rep-bar .btn.small { flex: none; }
+.submit-wrap .notice { margin-bottom: 10px; }

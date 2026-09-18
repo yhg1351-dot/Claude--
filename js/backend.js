@@ -42,6 +42,7 @@ function makeSupabase() {
     claimGroup: (code, deviceId) => rpc("claim_group", { p_code: code, p_device_id: deviceId }),
     heartbeat: (token) => rpc("heartbeat", { p_token: token }),
     getProgress: (token) => rpc("get_progress", { p_token: token }),
+    getGroupProgress: (code) => rpc("get_group_progress", { p_code: code }),
     async uploadPhoto(code, path, blob) {
       try {
         const { error } = await client.storage.from("photos").upload(path, blob, {
@@ -218,6 +219,12 @@ function makeLocal() {
       if (!s) return { ok: false, reason: "invalid" };
       const rows = (await store.all("localSubmissions")).filter((r) => r.group_code === s.code);
       return { ok: true, submissions: rows };
+    },
+    async getGroupProgress(code) {
+      const s = sessions()[code];
+      const rows = (await store.all("localSubmissions")).filter((r) => r.group_code === code)
+        .map((r) => ({ mission_id: r.mission_id, place_id: r.place_id, photo_count: (r.photo_paths || []).length, updated_at: r.updated_at }));
+      return { ok: true, submissions: rows, rep: { exists: !!s, active: !!s && Date.now() - s.last_seen < timeoutMs, last_seen: s ? s.last_seen : null } };
     },
     async uploadPhoto(code, path, blob) {
       await store.put("photos", { key: path, blob, code });

@@ -57,13 +57,14 @@ function fmtTime(iso) {
   const d = new Date(iso);
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
+// 모둠의 '대표 폰' 상태 (보기만 하는 폰은 서버에 기록하지 않음)
 function sessionStatus(s) {
-  if (!s) return { label: "미접속", cls: "gray" };
+  if (!s) return { label: "대표 없음", cls: "gray" };
   const age = Date.now() - new Date(s.last_seen).getTime();
   const timeout = (CFG.lockTimeoutMinutes || 5) * 60 * 1000;
-  if (age < timeout) return { label: "접속 중", cls: "ok" };
+  if (age < timeout) return { label: "대표 접속 중", cls: "ok" };
   if (age > 12 * 3600 * 1000) return { label: "해제됨", cls: "gray" };
-  return { label: "잠금 풀림", cls: "warn" };
+  return { label: "대표 신호 끊김", cls: "warn" };
 }
 function answerText(sub, m) {
   const a = sub.answer || {};
@@ -191,7 +192,7 @@ function viewOverview() {
 
   const wrap = el("div");
   wrap.append(el("div", { class: "kpis" }, [
-    kpi(`${active}/${codes.length}`, "접속 중 / 모둠"), kpi(`${submittedGroups}`, "제출 시작한 모둠"),
+    kpi(`${active}/${codes.length}`, "대표 폰 접속 중 / 모둠"), kpi(`${submittedGroups}`, "제출 시작한 모둠"),
     kpi(state.submissions.filter((s) => codes.includes(s.group_code)).length, `제출 건수 (최대 ${totalMissions * codes.length})`), kpi(photoCount, "사진 수"),
   ]));
 
@@ -203,7 +204,7 @@ function viewOverview() {
     const last = subs.map((x) => x.updated_at || x.created_at).sort().pop();
     const releaseBtn = s && st.cls !== "gray"
       ? el("button", { class: "btn small ghost", onclick: async () => {
-          if (!confirm(`${codeLabel(code)}의 접속을 해제할까요? 다른 휴대폰이 바로 이 코드로 들어올 수 있게 됩니다.`)) return;
+          if (!confirm(`${codeLabel(code)}의 대표 폰을 해제할까요? 다른 휴대폰이 바로 대표 폰이 될 수 있게 됩니다.`)) return;
           const r = await backend.releaseGroup(code);
           if (!r.ok) alert(`실패: ${r.message || ""}`); else load();
         } }, "해제")
@@ -228,7 +229,7 @@ function viewOverview() {
     const st = sessionStatus(s);
     const hd = el("div", { class: "hd" }, [el("strong", {}, codeLabel(code)), el("span", { class: `chip ${st.cls}` }, st.label)]);
     if (s && st.cls !== "gray") hd.append(el("button", { class: "btn small ghost", onclick: async () => {
-      if (!confirm(`${codeLabel(code)}의 접속을 해제할까요?`)) return;
+      if (!confirm(`${codeLabel(code)}의 대표 폰을 해제할까요?`)) return;
       const r = await backend.releaseGroup(code);
       if (!r.ok) alert(`실패: ${r.message || ""}`); else load();
     } }, "해제"));
@@ -240,7 +241,7 @@ function viewOverview() {
     cards.append(el("div", { class: "group-card" }, [hd, pls]));
   }
   wrap.append(cards);
-  wrap.append(el("p", { class: "muted small" }, `접속 표시: "접속 중"은 최근 ${CFG.lockTimeoutMinutes || 5}분 안에 신호가 온 기기가 있음. "잠금 풀림"은 신호가 끊겨 다른 기기가 들어올 수 있는 상태. 30초마다 자동 갱신.`));
+  wrap.append(el("p", { class: "muted small" }, `모둠원은 누구나 앱을 볼 수 있고, 제출은 모둠이 정한 '대표 폰' 한 대만 합니다. "대표 접속 중"은 최근 ${CFG.lockTimeoutMinutes || 5}분 안에 대표 폰 신호가 있음, "대표 신호 끊김"은 다른 폰이 대표를 이어받을 수 있는 상태. '해제'를 누르면 바로 다른 폰이 대표가 될 수 있습니다. 30초마다 자동 갱신.`));
   return wrap;
 }
 function kpi(v, l) { return el("div", { class: "kpi" }, [el("div", { class: "v" }, String(v)), el("div", { class: "l" }, l)]); }
@@ -370,7 +371,7 @@ function viewTools() {
   wrap.append(el("div", { class: "card" }, [
     el("h2", {}, "운영 안내"),
     el("ul", { class: "muted small" }, [
-      el("li", {}, "학생이 폰을 바꿔야 할 때: 현황 탭에서 해당 모둠의 '해제' 버튼을 누르면 새 폰이 바로 접속할 수 있습니다."),
+      el("li", {}, "모둠의 대표 폰을 바꿔야 할 때: 현황 탭에서 해당 모둠의 '해제' 버튼을 누르면 새 폰에서 바로 '대표 폰으로 정하기'를 누를 수 있습니다."),
       el("li", {}, "사진이 안 보일 때: 학생 폰이 아직 전송 중일 수 있습니다. 신호가 잡히면 자동으로 올라옵니다."),
       el("li", {}, "미션 내용 수정: 저장소의 data/missions.json 파일을 고치면 1~2분 뒤 반영됩니다."),
     ]),

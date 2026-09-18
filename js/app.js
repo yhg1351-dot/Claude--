@@ -99,19 +99,38 @@ function modal({ title, body, buttons }) {
 }
 
 // ------------------------------------------------------------ 세션 / 접속 잠금
+// 모둠 코드로 들어가면 누구나 일정·미션을 볼 수 있다(보기 모드). 제출은 '대표 폰'으로 정한 한 대만 가능.
 async function login(code) {
-  const r = await backend.claimGroup(code, deviceId());
+  state.session = { code, token: null, rep: false, deviceId: deviceId(), at: Date.now() };
+  state.loginMessage = null;
+  ls.set("mq-session", state.session);
+  loadProgress();
+  await loadDrafts();
+  await pullProgress();
+  return { ok: true };
+}
+function isRep() { return !!(state.session && state.session.rep && state.session.token); }
+// 이 폰을 모둠 대표 폰으로 정한다 (서버 잠금 획득)
+async function claimRep() {
+  if (!state.session) return { ok: false };
+  if (!navigator.onLine) return { ok: false, reason: "network" };
+  const r = await backend.claimGroup(state.session.code, state.session.deviceId || deviceId());
   if (r.ok) {
-    state.session = { code, token: r.token, deviceId: deviceId(), at: Date.now() };
-    state.loginMessage = null;
+    state.session = { ...state.session, token: r.token, rep: true, at: Date.now() };
     ls.set("mq-session", state.session);
-    loadProgress();
-    await loadDrafts();
     resumeAfterLogin();
     await pullProgress();
     return { ok: true };
   }
   return r;
+}
+function dropRep(message) {
+  if (!state.session) return;
+  // 토큰은 남겨 두어 대기 중인 제출이 '직전 토큰'으로 접수될 수 있게 한다
+  state.session = { ...state.session, rep: false };
+  ls.set("mq-session", state.session);
+  if (message) toast(message, "warn", 4000);
+  render();
 }
 function logoutLocal(message) {
   state.session = null;
@@ -124,7 +143,7 @@ function logoutLocal(message) {
 // 다른 기기가 실제로 쓰고 있을 때만 로그아웃한다.
 let recovering = null;
 async function recoverSession() {
-  if (!state.session) return false;
+  if (!isRep()) return false;
   if (recovering) return recovering;
   recovering = (async () => {
     const r = await backend.claimGroup(state.session.code, state.session.deviceId || deviceId());
@@ -135,7 +154,7 @@ async function recoverSession() {
       return true;
     }
     if (r.reason === "in_use") {
-      logoutLocal("다른 기기에서 이 모둠 코드로 접속했어요. 그 폰을 쓰거나, 선생님께 접속 해제를 요청한 뒤 코드를 다시 입력해 주세요.");
+      dropRep("다른 폰이 우리 모둠 대표 폰이 되었어요. 이 폰은 보기 모드로 바뀌었어요.");
     }
     // 네트워크 오류면 그대로 두고 다음에 다시 시도
     return false;
@@ -144,7 +163,7 @@ async function recoverSession() {
 }
 let hbTimer = null;
 async function heartbeat() {
-  if (!state.session || !navigator.onLine) return;
+  if (!isRep() || !navigator.onLine) return;
   const r = await backend.heartbeat(state.session.token);
   if (!r.ok && r.reason === "invalid") await recoverSession();
 }
@@ -156,14 +175,17 @@ function startHeartbeat() {
 // 서버에 저장된 제출 내역을 받아 로컬 진행 상태와 합친다 (기기가 바뀌어도 진행 상태 유지)
 async function pullProgress() {
   if (!state.session || !navigator.onLine) return;
-  const r = await backend.getProgress(state.session.token);
+  const r = isRep() ? await backend.getProgress(state.session.token) : await backend.getGroupProgress(state.session.code);
   if (!r.ok || !Array.isArray(r.submissions)) return;
+  if (r.rep) state.repInfo = r.rep;
   const queued = new Set((await pending()).map((i) => i.missionId));
   const onServer = new Set(r.submissions.map((s) => s.mission_id));
   for (const s of r.submissions) {
     if (queued.has(s.mission_id)) continue; // 아직 보내지 않은 새 제출이 우선
+    const prevAnswer = state.progress[s.mission_id] ? state.progress[s.mission_id].answer : undefined;
     state.progress[s.mission_id] = {
-      status: "sent", answer: s.answer, photoCount: (s.photo_paths || []).length, at: s.updated_at || s.created_at,
+      status: "sent", answer: s.answer !== undefined ? s.answer : prevAnswer,
+      photoCount: s.photo_count !== undefined ? s.photo_count : (s.photo_paths || []).length, at: s.updated_at || s.created_at,
     };
   }
   // 서버에서 지워진 제출(교사 전체 삭제 등)은 폰 화면에서도 '완료' 표시를 내린다
@@ -265,7 +287,7 @@ function viewLogin() {
     el("div", { class: "field" }, input),
     err,
     btn,
-    el("p", { class: "muted small", style: "margin-top:12px" }, "모둠에서 한 대의 휴대폰으로만 접속할 수 있어요. 다른 폰으로 바꾸려면 선생님께 말씀하세요."),
+    el("p", { class: "muted small", style: "margin-top:12px" }, "모둠원 모두 들어와서 일정과 미션을 볼 수 있어요. 미션 제출은 모둠에서 정한 '대표 폰' 한 대에서만 해요."),
     !isConfigured ? el("div", { class: "notice info small" }, "데모 모드: 제출 내용이 이 기기 안에만 저장됩니다.") : null,
   ]);
   const submit = async () => {
@@ -273,17 +295,9 @@ function viewLogin() {
     err.classList.add("hidden");
     if (!validCode(code)) { err.textContent = "없는 모둠 코드예요. 다시 확인해 주세요."; err.classList.remove("hidden"); return; }
     btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> 확인 중';
-    const r = await login(code);
+    await login(code);
     btn.disabled = false; btn.textContent = "시작하기";
-    if (r.ok) { go("#/"); render(); return; }
-    if (r.reason === "in_use") {
-      err.textContent = `이 모둠 코드는 지금 다른 휴대폰에서 사용 중이에요. 그 폰에서 ${CFG.lockTimeoutMinutes || 5}분 동안 앱을 쓰지 않으면 자동으로 풀리고, 선생님이 바로 풀어 줄 수도 있어요.`;
-    } else if (r.reason === "network") {
-      err.textContent = "인터넷 연결이 불안정해요. 신호가 잡히는 곳에서 다시 눌러 주세요.";
-    } else {
-      err.textContent = "접속에 실패했어요. 잠시 후 다시 시도해 주세요.";
-    }
-    err.classList.remove("hidden");
+    go("#/"); render();
   };
   btn.addEventListener("click", submit);
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
@@ -326,6 +340,7 @@ function viewHome() {
     ]),
     ringEl(tp.done, tp.total),
   ]));
+  wrap.append(viewRepCard());
   if (state.pendingItems && state.pendingItems.length) wrap.append(viewPendingCard());
   for (const day of state.data.trip.days) {
     wrap.append(el("div", { class: "day-title" }, day.label || `${day.day}일차`));
@@ -366,13 +381,46 @@ function viewHome() {
       const n = (await pending()).length;
       const ok = await modal({
         title: "접속을 끊을까요?",
-        body: n > 0 ? `아직 서버로 보내지 못한 제출이 ${n}개 있어요. 지금 끊으면 나중에 같은 코드로 다시 접속했을 때 마저 보내요.` : "제출한 내용은 서버에 남아 있어요.",
+        body: n > 0 ? `아직 서버로 보내지 못한 제출이 ${n}개 있어요. 지금 끊으면 나중에 같은 코드로 다시 접속했을 때 마저 보내요.` : (isRep() ? "이 폰은 대표 폰이에요. 접속을 끊어도 제출한 내용은 서버에 남아 있어요." : "제출한 내용은 서버에 남아 있어요."),
         buttons: [{ label: "취소", value: false }, { label: "접속 끊기", value: true, kind: "danger" }],
       });
       if (ok) logoutLocal();
     } }, "여기를 누르세요"),
   ]));
   return wrap;
+}
+
+// 대표 폰 상태 카드: 보기 모드면 '대표 폰으로 정하기' 버튼, 대표 폰이면 표시만
+function viewRepCard() {
+  if (isRep()) {
+    return el("div", { class: "rep-bar rep" }, [el("span", {}, "📱 이 폰이 우리 모둠 대표 폰이에요"), el("span", { class: "muted small" }, "미션 제출은 이 폰에서")]);
+  }
+  const info = state.repInfo || {};
+  const btn = el("button", { class: "btn small gold", onclick: () => becomeRep(btn) }, info.exists && info.active ? "대표 폰 이어받기" : "우리 모둠 대표 폰으로 정하기");
+  return el("div", { class: "rep-bar" }, [
+    el("div", {}, [
+      el("div", { style: "font-weight:800" }, "지금은 보기 모드예요"),
+      el("div", { class: "muted small" }, info.exists && info.active ? "우리 모둠에는 이미 대표 폰이 있어요. 미션 제출은 그 폰에서 해요." : "미션을 제출하려면 모둠에서 폰 한 대를 대표로 정하세요."),
+    ]),
+    btn,
+  ]);
+}
+async function becomeRep(btn) {
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>'; }
+  const r = await claimRep();
+  if (r.ok) { toast("이 폰이 우리 모둠 대표 폰이 되었어요!", "ok"); render(); return; }
+  if (btn) { btn.disabled = false; btn.textContent = "우리 모둠 대표 폰으로 정하기"; }
+  if (r.reason === "in_use") {
+    await modal({
+      title: "이미 대표 폰이 있어요",
+      body: `우리 모둠은 다른 폰이 대표예요. 그 폰에서 ${CFG.lockTimeoutMinutes || 5}분 동안 앱을 쓰지 않으면 이 버튼으로 이어받을 수 있고, 선생님이 바로 풀어 줄 수도 있어요.`,
+      buttons: [{ label: "알겠어요", value: true, kind: "primary" }],
+    });
+  } else if (r.reason === "network") {
+    toast("인터넷 연결이 불안정해요. 신호가 잡히는 곳에서 다시 눌러 주세요.", "error", 3500);
+  } else {
+    toast("잠시 후 다시 시도해 주세요.", "error");
+  }
 }
 
 // 전송 대기 중인 제출과 마지막 오류를 보여 주는 카드 (문제 파악용)
@@ -565,7 +613,16 @@ function viewMission(placeId, missionId) {
     }
     function showErr(t) { err.textContent = t; err.classList.remove("hidden"); submitBtn.disabled = false; submitBtn.textContent = prev ? "다시 제출하기" : "제출하기"; }
   });
-  card.append(el("div", { class: "submit-wrap" }, submitBtn));
+  if (isRep()) {
+    card.append(el("div", { class: "submit-wrap" }, submitBtn));
+  } else {
+    const info = state.repInfo || {};
+    const repBtn = el("button", { class: "btn gold", onclick: () => becomeRep(repBtn) }, info.exists && info.active ? "대표 폰 이어받기" : "우리 모둠 대표 폰으로 정하기");
+    card.append(el("div", { class: "submit-wrap" }, [
+      el("div", { class: "notice info" }, "제출은 우리 모둠 대표 폰에서만 할 수 있어요. 여기서 적은 내용은 이 폰에만 저장돼요."),
+      repBtn,
+    ]));
+  }
   wrap.append(card);
   return wrap;
 }
@@ -611,6 +668,7 @@ async function init() {
     return;
   }
   state.session = ls.get("mq-session");
+  if (state.session && state.session.token && state.session.rep === undefined) { state.session.rep = true; ls.set("mq-session", state.session); }
   if (state.session) { loadProgress(); await loadDrafts(); restoreRoute(); }
 
   onSync(async (ev) => {
