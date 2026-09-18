@@ -129,7 +129,7 @@ export function createEditor(container, ctx) {
     wrap.append(el("h2", { class: "mission-section" }, "일정"));
     const placeOptions = placeList().map(([id, p]) => [id, `${p.emoji || ""} ${p.name}`]);
     (t.days || []).forEach((day, di) => {
-      const card = el("div", { class: "card" });
+      const card = el("div", { class: "card", "data-jump-id": `day-${di}` });
       card.append(el("h2", {}, [day.label || `${day.day}일차`, el("span", { class: "sp" }),
         el("div", { class: "stop-actions" }, [
           el("button", { class: "btn small ghost", "aria-label": "위로", disabled: di === 0, onclick: () => { moveItem(t.days, di, -1); markDirty(); render(); } }, "↑"),
@@ -303,6 +303,15 @@ export function createEditor(container, ctx) {
     } }, "+ 장소 추가")));
     return wrap;
   }
+  function scrollToCard(jumpId) {
+    const card = container.querySelector(`[data-jump-id="${jumpId}"]`);
+    if (!card) return;
+    const bar = container.querySelector(".ed-toolbar");
+    const offset = (bar ? bar.getBoundingClientRect().bottom : 0) + 8;
+    window.scrollTo({ top: card.getBoundingClientRect().top + window.scrollY - offset, behavior: "smooth" });
+    card.classList.add("focus");
+    setTimeout(() => card.classList.remove("focus"), 2000);
+  }
   function scrollToPlace(id) {
     const card = container.querySelector(`[data-place-id="${id}"]`);
     if (!card) return;
@@ -395,6 +404,13 @@ export function createEditor(container, ctx) {
         el("button", { class: "btn small ghost", onclick: resetToDefault }, "기본 파일로 되돌리기"),
       ]),
     ]);
+    // 일정 탭: 날짜 바로가기 칩
+    if (tab === "schedule" && (draft.trip.days || []).length) {
+      toolbar.append(el("div", { class: "place-jump" }, [
+        el("span", { class: "muted small", style: "flex:none" }, "바로가기"),
+        ...(draft.trip.days || []).map((d, i) => el("button", { class: "chip gray jump", onclick: () => scrollToCard(`day-${i}`) }, d.label || `${d.day}일차`)),
+      ]));
+    }
     // 장소와 미션 탭: 장소 바로가기 칩 (누르면 그 장소 카드로 스크롤)
     if (tab === "places" && placeList().length) {
       toolbar.append(el("div", { class: "place-jump" }, [
