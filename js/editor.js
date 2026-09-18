@@ -251,7 +251,16 @@ export function createEditor(container, ctx) {
     wrap.append(el("h2", { class: "mission-section" }, "장소와 미션"));
     placeList().forEach(([id, p]) => {
       const card = el("div", { class: "card" });
-      card.append(el("h2", {}, [`${p.emoji || ""} ${p.name || "(이름 없음)"}`, el("span", { class: "sp" }), el("button", { class: "btn small ghost", onclick: () => {
+      card.append(el("h2", {}, [`${p.emoji || ""} ${p.name || "(이름 없음)"}`, el("span", { class: "sp" }),
+        el("button", { class: "btn small ghost", title: "저장소의 기본 파일(data/missions.json)에 있는 이 장소의 내용으로 바꿉니다", onclick: async () => {
+          const def = await loadDefaultData();
+          const dp = def.places && def.places[id];
+          if (!dp) { alert("기본 파일에 같은 장소가 없습니다."); return; }
+          if (!confirm(`"${p.name}"의 이름·안내문·미션을 기본 파일 내용으로 바꿀까요? 다른 장소와 일정은 그대로 둡니다.`)) return;
+          draft.places[id] = clone(dp);
+          markDirty(); render();
+        } }, "기본 파일에서 가져오기"),
+        el("button", { class: "btn small ghost", onclick: () => {
         const used = (draft.trip.days || []).some((d) => (d.stops || []).some((s) => s.placeId === id));
         if (!confirm(`"${p.name}" 장소를 삭제할까요?${used ? " 일정에서도 함께 빠집니다." : ""}`)) return;
         delete draft.places[id];
