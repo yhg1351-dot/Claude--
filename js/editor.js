@@ -159,10 +159,11 @@ export function createEditor(container, ctx) {
           const labelInput = el("input", { class: "input", placeholder: "예: 버스 이동, 점심 식사", value: stop.label || "", style: "flex:1;min-width:140px", oninput: (e) => { stop.label = e.target.value; markDirty(); } });
           row.append(emojiSel, labelInput);
         }
-        row.append(
+        row.append(el("div", { class: "stop-actions" }, [
           el("button", { class: "btn small ghost", "aria-label": "위로", onclick: () => { moveItem(day.stops, si, -1); markDirty(); render(); } }, "↑"),
           el("button", { class: "btn small ghost", "aria-label": "아래로", onclick: () => { moveItem(day.stops, si, 1); markDirty(); render(); } }, "↓"),
-          el("button", { class: "btn small ghost", onclick: () => { day.stops.splice(si, 1); markDirty(); render(); } }, "삭제"));
+          el("button", { class: "btn small ghost", onclick: () => { day.stops.splice(si, 1); markDirty(); render(); } }, "삭제"),
+        ]));
         card.append(row);
       });
       card.append(el("div", { class: "ed-actions" }, [

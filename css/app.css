@@ -271,6 +271,7 @@ table.grid tr:last-child td { border-bottom: 0; }
 .ed-item { border: 1.5px solid var(--line); border-radius: var(--radius-sm); padding: 12px; margin: 10px 0; background: #fffdf8; }
 .ed-item.stop-item { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 10px; }
 .ed-item.stop-item select, .ed-item.stop-item input { min-height: 40px; }
+.stop-actions { display: flex; gap: 4px; margin-left: auto; }
 .ed-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .ed-actions .btn.small { min-height: 34px; }
 .ed-toolbar { position: sticky; top: var(--tt-h, 56px); z-index: 4; background: var(--bg); margin: 0 -16px; padding: 4px 16px 8px; border-bottom: 1px solid var(--line); box-shadow: 0 8px 14px -10px rgba(29,36,64,.25); }
