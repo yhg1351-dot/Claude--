@@ -206,7 +206,8 @@ body.has-status .app { padding-bottom: calc(76px + var(--safe-b)); }
 .spinner { width: 22px; height: 22px; border: 3px solid rgba(120,130,170,.35); border-top-color: currentColor; border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; vertical-align: middle; }
 
 /* ---------- 교사 화면 ---------- */
-.teacher-top { display: flex; align-items: center; gap: 8px; padding: 12px 0 8px; position: sticky; top: 0; z-index: 5; background: var(--bg); }
+.teacher-head { display: contents; } /* 상단 바가 화면 전체 기준으로 고정되도록 */
+.teacher-top { display: flex; align-items: center; gap: 8px; padding: 12px 0 8px; position: sticky; top: 0; z-index: 5; background: var(--bg); margin: 0 -16px; padding-left: 16px; padding-right: 16px; }
 .teacher-top h1 { font-size: 17px; margin: 0; flex: 1; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tabs { display: flex; gap: 6px; overflow-x: auto; padding: 6px 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .tabs::-webkit-scrollbar { display: none; }
@@ -270,8 +271,14 @@ table.grid tr:last-child td { border-bottom: 0; }
 .ed-item.stop-item select, .ed-item.stop-item input { min-height: 40px; }
 .ed-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .ed-actions .btn.small { min-height: 34px; }
-.ed-toolbar { position: sticky; top: 52px; z-index: 4; background: var(--bg); padding: 8px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.ed-toolbar .status { font-size: 13px; color: var(--muted); flex: 1; }
+.ed-toolbar { position: sticky; top: var(--tt-h, 56px); z-index: 4; background: var(--bg); margin: 0 -16px; padding: 4px 16px 8px; border-bottom: 1px solid var(--line); box-shadow: 0 8px 14px -10px rgba(29,36,64,.25); }
+.ed-toolbar .tabs { padding: 4px 0 6px; }
+.ed-toolbar-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ed-toolbar .status { font-size: 13px; color: var(--muted); flex: 1; min-width: 160px; }
+@media (max-width: 719.98px) {
+  .ed-toolbar .status { flex: 1 1 100%; order: 2; margin-top: 4px; }
+  .ed-toolbar-row .btn.small { flex: 1; }
+}
 .ed-thumb { width: 120px; height: 80px; object-fit: cover; border-radius: 8px; background: #ece8df; display: block; }
 .opt-row { display: flex; gap: 6px; align-items: center; margin: 6px 0; }
 .opt-row input[type=radio] { width: 20px; height: 20px; }

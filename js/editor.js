@@ -29,6 +29,7 @@ export function createEditor(container, ctx) {
   let dirty = false;
   let saving = false;
   let statusText = "";
+  let tab = "basics"; // basics | schedule | places
 
   const markDirty = () => { dirty = true; renderToolbarStatus(); };
   const placeList = () => Object.entries(draft.places);
@@ -322,13 +323,19 @@ export function createEditor(container, ctx) {
     container.innerHTML = "";
     container.className = "editor";
     const saveBtn = el("button", { class: "btn small gold", onclick: () => save(false) }, "저장");
+    const subtabs = [["basics", "기본 정보"], ["schedule", "일정"], ["places", "장소와 미션"]];
     container.append(el("div", { class: "ed-toolbar" }, [
-      toolbarStatus, saveBtn,
-      el("button", { class: "btn small ghost", onclick: resetToDefault }, "기본 파일로 되돌리기"),
+      el("div", { class: "tabs" }, subtabs.map(([k, l]) => el("button", { class: k === tab ? "active" : "", onclick: () => { tab = k; render(); window.scrollTo({ top: 0 }); } }, l))),
+      el("div", { class: "ed-toolbar-row" }, [
+        toolbarStatus, saveBtn,
+        el("button", { class: "btn small ghost", onclick: resetToDefault }, "기본 파일로 되돌리기"),
+      ]),
     ]));
     renderToolbarStatus();
     container.append(el("p", { class: "muted small" }, `장소 ${placeList().length}곳 · 미션 ${missionCount()}개. 고친 뒤 위의 "저장"을 눌러야 학생 앱에 반영됩니다.`));
-    container.append(sectionBasics(), sectionSchedule(), sectionPlaces());
+    if (tab === "basics") container.append(sectionBasics());
+    else if (tab === "schedule") container.append(sectionSchedule());
+    else container.append(sectionPlaces());
   }
   render();
   window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });

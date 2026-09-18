@@ -108,6 +108,9 @@ function render() {
   else if (state.tab === "byGroup") app.append(viewByGroup());
   else if (state.tab === "tools") app.append(viewTools());
   else if (state.tab === "edit") app.append(viewEdit());
+  // 편집 화면의 고정 바가 상단 바 바로 아래에 붙도록 상단 바 높이를 알려 준다
+  const top = app.querySelector(".teacher-top");
+  if (top) document.documentElement.style.setProperty("--tt-h", `${top.offsetHeight}px`);
 }
 
 // 편집 탭: 화면을 다시 그려도 편집 중인 내용이 남도록 컨테이너를 재사용
@@ -158,7 +161,7 @@ function viewLogin() {
 
 function viewHeader() {
   const tabs = [["overview", "현황"], ["byPlace", "장소별 제출"], ["byGroup", "모둠별 제출"], ["edit", "편집"], ["tools", "도구"]];
-  return el("div", {}, [
+  return el("div", { class: "teacher-head" }, [
     el("div", { class: "teacher-top" }, [
       el("h1", {}, "교사 확인 화면"),
       el("span", { class: "muted small" }, state.loadedAt ? `${fmtTime(state.loadedAt.toISOString())} 갱신` : ""),
