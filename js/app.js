@@ -106,7 +106,7 @@ function toast(msg, kind = "info", ms = 2500) {
 }
 function modal({ title, body, buttons }) {
   return new Promise((resolve) => {
-    const box = el("div", { class: "box" }, [el("h3", {}, title), el("div", { class: "muted", style: "font-size:15px" }, body)]);
+    const box = el("div", { class: "box" }, [el("h3", {}, title), el("div", { class: "muted", style: "font-size:15px;color:var(--ink-2)" }, body)]);
     const ov = el("div", { class: "overlay" }, box);
     const row = el("div", { class: "row", style: "margin-top:14px" });
     for (const b of buttons) {
@@ -247,6 +247,36 @@ function restoreRoute() {
   if (last && last.hash && Date.now() - last.at < 30 * 60 * 1000) history.replaceState(null, "", last.hash);
 }
 
+// ------------------------------------------------------------ 홈 화면에 추가 (PWA 설치)
+let installPrompt = null; // 안드로이드 크롬 등이 주는 설치 창
+window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installPrompt = e; render(); });
+window.addEventListener("appinstalled", () => { installPrompt = null; ls.set("mq-installed", true); toast("홈 화면에 추가했어요! 이제 아이콘으로 바로 열 수 있어요.", "ok", 3500); render(); });
+function isStandalone() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+function isIOS() { return /iPhone|iPad|iPod/i.test(navigator.userAgent) && !window.MSStream; }
+function installButton(compact) {
+  if (isStandalone() || inAppBrowser()) return null;
+  const ios = isIOS();
+  const btn = el("button", { class: compact ? "btn small" : "btn", onclick: async () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      try { await installPrompt.userChoice; } catch (e) {}
+      installPrompt = null; render();
+      return;
+    }
+    const steps = ios
+      ? ["아래 가운데 공유 버튼(네모에 화살표)을 누르세요.", "목록에서 '홈 화면에 추가'를 찾아 누르세요.", "오른쪽 위 '추가'를 누르면 끝!"]
+      : ["오른쪽 위 메뉴(⋮)를 누르세요.", "'홈 화면에 추가' 또는 '앱 설치'를 누르세요.", "'추가' 또는 '설치'를 누르면 끝!"];
+    await modal({
+      title: "홈 화면에 앱 추가하기",
+      body: el("ol", { style: "padding-left:20px;margin:0;line-height:1.7" }, steps.map((t) => el("li", {}, t))),
+      buttons: [{ label: "알겠어요", value: true, kind: "primary" }],
+    });
+  } }, "📲 홈 화면에 앱 추가");
+  return btn;
+}
+
 // 카카오톡·네이버·인스타그램 등 앱 안의 브라우저인지 (카메라·저장 기능이 불안정함)
 function inAppBrowser() {
   const ua = navigator.userAgent || "";
@@ -320,6 +350,7 @@ function viewLogin() {
     el("p", { class: "muted small", style: "margin-top:12px" }, "모둠원 모두 들어와서 일정과 미션을 볼 수 있어요. 미션 제출은 모둠에서 정한 '대표 폰' 한 대에서만 해요."),
     !isConfigured ? el("div", { class: "notice info small" }, "데모 모드: 제출 내용이 이 기기 안에만 저장됩니다.") : null,
   ]);
+  { const ib = installButton(false); if (ib) card.append(el("div", { class: "install-row" }, [ib, el("p", { class: "muted small", style: "margin:6px 0 0" }, "아이콘으로 바로 열면 매번 주소를 찾지 않아도 돼요.")])); }
   const submit = async () => {
     const code = input.value.trim();
     err.classList.add("hidden");
@@ -405,6 +436,7 @@ function viewHome() {
     }
     wrap.append(tl);
   }
+  { const ib = installButton(true); if (ib) wrap.append(el("div", { class: "install-row", style: "text-align:center;margin-top:18px" }, ib)); }
   wrap.append(el("p", { class: "muted small", style: "margin-top:20px;text-align:center" }, [
     "다른 모둠 코드로 바꾸려면 ",
     el("a", { href: "#", onclick: async (e) => {

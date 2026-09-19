@@ -373,3 +373,5 @@ table.grid tr:last-child td { border-bottom: 0; }
 .stamp-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
 .stamp-btn { border-color: var(--red); color: var(--red); background: #fff; }
 .stamp-btn:hover { background: var(--red-soft); }
+.install-row { margin-top: 14px; }
+.install-row .btn { border-color: var(--indigo); color: var(--indigo); }
