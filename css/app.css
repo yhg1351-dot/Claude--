@@ -359,15 +359,14 @@ table.grid tr:last-child td { border-bottom: 0; }
 /* ---------- 도장 ---------- */
 .stamp-card .row { align-items: center; }
 .stamp-count { flex: none; font-size: 22px; font-weight: 900; text-align: right; }
-.stamp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
-@media (min-width: 420px) { .stamp-grid { grid-template-columns: repeat(5, 1fr); } }
-.stamp-slot { position: relative; aspect-ratio: 1; border-radius: 50%; border: 2px dashed #d9d3c4; background: #fffdf8; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px; }
-.stamp-slot .no { font-weight: 800; color: #b8b3a6; font-size: 15px; }
+.stamp-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 10px; }
+.stamp-slot { position: relative; aspect-ratio: 1; border-radius: 50%; border: 1.5px dashed #d9d3c4; background: #fffdf8; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 2px; }
+.stamp-slot .no { font-weight: 800; color: #b8b3a6; font-size: 12px; }
 .stamp-slot .lbl { display: none; }
-.stamp-slot .wait { font-size: 10px; font-weight: 800; color: var(--amber); }
+.stamp-slot .wait { font-size: 8px; font-weight: 800; color: var(--amber); letter-spacing: -.02em; }
 .stamp-slot.pending { border-style: solid; border-color: var(--amber-soft); background: #fff8ec; }
 .stamp-slot.stamped { border: 2px solid var(--red); background: #fff; }
-.seal { display: grid; place-items: center; width: 74%; height: 74%; border-radius: 50%; border: 2.5px solid var(--red); color: var(--red); font-weight: 900; font-size: 13px; letter-spacing: 1px; transform: rotate(-14deg); box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 3.5px var(--red); opacity: .9; animation: pop .35s ease-out; }
+.seal { display: grid; place-items: center; width: 78%; height: 78%; border-radius: 50%; border: 2px solid var(--red); color: var(--red); font-weight: 900; font-size: 10px; letter-spacing: .5px; transform: rotate(-14deg); box-shadow: inset 0 0 0 1.5px #fff, inset 0 0 0 2.5px var(--red); opacity: .9; animation: pop .35s ease-out; }
 .seal-mini { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--red); color: var(--red); font-weight: 900; font-size: 10px; transform: rotate(-12deg); background: #fff; flex: none; }
 .stamped-notice { display: flex; align-items: center; gap: 10px; font-weight: 700; }
 .cert-holder svg { width: 100%; height: auto; display: block; border-radius: 10px; }

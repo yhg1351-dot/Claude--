@@ -431,10 +431,12 @@ function viewStampBoard() {
     el("h2", { style: "margin:0" }, "도장판"),
     el("div", { class: "stamp-count" }, [el("strong", {}, String(ss.stamped)), el("span", { class: "muted" }, ` / ${ss.total}`)]),
   ]));
-  const grid = el("div", { class: "stamp-grid" });
+  // 칸 수가 늘어도 두 줄 안팎이 되도록 열 수를 정한다 (한 줄 최대 8칸)
+  const cols = Math.max(4, Math.min(8, Math.ceil(ms.length / 2)));
+  const grid = el("div", { class: "stamp-grid", style: `grid-template-columns: repeat(${cols}, 1fr)` });
   ms.forEach((m, i) => {
     const st = state.stamps[m.id] ? "stamped" : state.progress[m.id] ? "pending" : "";
-    grid.append(el("button", { class: `stamp-slot ${st}`, title: m.title, onclick: () => go(`#/mission/${m.placeId}/${m.id}`) }, [
+    grid.append(el("div", { class: `stamp-slot ${st}`, title: m.title }, [
       st === "stamped" ? el("span", { class: "seal" }, "도장") : st === "pending" ? el("span", { class: "wait" }, "검토 중") : el("span", { class: "no" }, String(i + 1)),
       el("span", { class: "lbl" }, m.title),
     ]));
