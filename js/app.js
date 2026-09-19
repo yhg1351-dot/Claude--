@@ -248,29 +248,74 @@ function restoreRoute() {
 }
 
 // ------------------------------------------------------------ 홈 화면에 추가 (PWA 설치)
-let installPrompt = null; // 안드로이드 크롬 등이 주는 설치 창
-window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installPrompt = e; render(); });
-window.addEventListener("appinstalled", () => { installPrompt = null; ls.set("mq-installed", true); toast("홈 화면에 추가했어요! 이제 아이콘으로 바로 열 수 있어요.", "ok", 3500); render(); });
+// 크롬은 서비스 워커 등록·manifest 검사가 끝난 뒤에야 설치 창(beforeinstallprompt)을 준다.
+// 그래서 서비스 워커는 데이터 로드를 기다리지 않고 가장 먼저 등록한다.
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./sw.js").catch(() => {});
+}
+let installPrompt = null; // 안드로이드 크롬·삼성 인터넷 등이 주는 설치 창
+let installWaiters = [];
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  installWaiters.splice(0).forEach((fn) => fn(e));
+  if (state.data) render();
+});
+window.addEventListener("appinstalled", () => { installPrompt = null; ls.set("mq-installed", true); toast("홈 화면에 추가했어요! 이제 아이콘으로 바로 열 수 있어요.", "ok", 3500); if (state.data) render(); });
 function isStandalone() {
   return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
 }
 function isIOS() { return /iPhone|iPad|iPod/i.test(navigator.userAgent) && !window.MSStream; }
+// 설치 창이 아직 준비 중이면 잠깐(최대 ms) 기다렸다가 돌려준다
+function waitInstallPrompt(ms) {
+  if (installPrompt) return Promise.resolve(installPrompt);
+  return new Promise((resolve) => {
+    const t = setTimeout(() => { installWaiters = installWaiters.filter((f) => f !== done); resolve(null); }, ms);
+    const done = (e) => { clearTimeout(t); resolve(e); };
+    installWaiters.push(done);
+  });
+}
+function browserKind() {
+  const ua = navigator.userAgent || "";
+  if (isIOS()) return /CriOS/i.test(ua) ? "ios-chrome" : "ios";
+  if (/SamsungBrowser/i.test(ua)) return "samsung";
+  if (/Android/i.test(ua) && /Chrome\//i.test(ua)) return "chrome";
+  return "other";
+}
+function installSteps(kind) {
+  switch (kind) {
+    case "ios": return ["아래 가운데 공유 버튼(네모에 화살표)을 누르세요.", "목록에서 '홈 화면에 추가'를 찾아 누르세요.", "오른쪽 위 '추가'를 누르면 끝!"];
+    case "ios-chrome": return ["주소창 오른쪽 공유 버튼(네모에 화살표)을 누르세요.", "목록에서 '홈 화면에 추가'를 찾아 누르세요.", "오른쪽 위 '추가'를 누르면 끝!"];
+    case "samsung": return ["아래 오른쪽 메뉴(≡)를 누르세요.", "'현재 페이지 추가' → '홈 화면'을 누르세요.", "'추가'를 누르면 끝!"];
+    case "chrome": return ["오른쪽 위 메뉴(⋮)를 누르세요.", "'홈 화면에 추가'(또는 '앱 설치')를 누르세요.", "'설치'를 누르면 끝! (설치가 안 보이면 '바로가기 만들기'도 괜찮아요)"];
+    default: return ["브라우저 메뉴를 여세요.", "'홈 화면에 추가' 또는 '앱 설치'를 누르세요.", "'추가' 또는 '설치'를 누르면 끝!"];
+  }
+}
 function installButton(compact) {
   if (isStandalone() || inAppBrowser()) return null;
-  const ios = isIOS();
   const btn = el("button", { class: compact ? "btn small" : "btn", onclick: async () => {
-    if (installPrompt) {
-      installPrompt.prompt();
-      try { await installPrompt.userChoice; } catch (e) {}
-      installPrompt = null; render();
+    btn.disabled = true;
+    const p = await waitInstallPrompt(2500); // 크롬이 설치 창을 늦게 주는 경우 대비
+    btn.disabled = false;
+    if (p) {
+      try {
+        p.prompt();
+        const choice = await p.userChoice;
+        if (choice && choice.outcome === "accepted") { installPrompt = null; render(); return; }
+      } catch (e) {}
+      installPrompt = null; // 한 번 쓴 설치 창은 다시 못 씀 → 이후엔 직접 추가 안내
+      render();
       return;
     }
-    const steps = ios
-      ? ["아래 가운데 공유 버튼(네모에 화살표)을 누르세요.", "목록에서 '홈 화면에 추가'를 찾아 누르세요.", "오른쪽 위 '추가'를 누르면 끝!"]
-      : ["오른쪽 위 메뉴(⋮)를 누르세요.", "'홈 화면에 추가' 또는 '앱 설치'를 누르세요.", "'추가' 또는 '설치'를 누르면 끝!"];
+    const kind = browserKind();
     await modal({
       title: "홈 화면에 앱 추가하기",
-      body: el("ol", { style: "padding-left:20px;margin:0;line-height:1.7" }, steps.map((t) => el("li", {}, t))),
+      body: el("div", {}, [
+        el("p", { class: "muted small", style: "margin:0 0 8px" }, kind === "chrome"
+          ? "이 폰의 크롬에서는 자동 설치 창이 열리지 않아요. 아래 순서대로 직접 추가해 주세요."
+          : "아래 순서대로 직접 추가해 주세요."),
+        el("ol", { style: "padding-left:20px;margin:0;line-height:1.7" }, installSteps(kind).map((t) => el("li", {}, t))),
+      ]),
       buttons: [{ label: "알겠어요", value: true, kind: "primary" }],
     });
   } }, "📲 홈 화면에 앱 추가");
@@ -846,8 +891,5 @@ async function init() {
   startHeartbeat();
   if (state.session) { heartbeat(); pullProgress(); }
 
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
-  }
 }
 init();
