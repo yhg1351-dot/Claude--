@@ -51,14 +51,19 @@ export async function enqueue({ code, placeId, missionId, answer, photos }) {
   return item;
 }
 
-// 대기 중인 항목 하나를 보내지 않고 지운다 (사진 원본도 함께)
-export async function discard(id) {
-  const item = await store.get("outbox", id);
-  if (!item) return false;
-  await store.del("outbox", id);
-  for (const path of item.photoPaths || []) { try { await store.del("photos", path); } catch (e) {} }
-  emit({ type: "idle" });
-  return true;
+// 설정된 시각(ISO 문자열) 이전에 만들어진 대기 항목을 보내지 않고 지운다 (사진 원본도 함께).
+// 지운 항목의 missionId 목록을 돌려준다.
+export async function purgeStale(beforeIso) {
+  const cutoff = beforeIso ? Date.parse(beforeIso) : NaN;
+  if (!cutoff) return [];
+  const removed = [];
+  for (const item of await store.all("outbox")) {
+    if (!(item.createdAt < cutoff)) continue;
+    await store.del("outbox", item.id);
+    for (const path of item.photoPaths || []) { try { await store.del("photos", path); } catch (e) {} }
+    removed.push(item.missionId);
+  }
+  return removed;
 }
 
 export async function pending() {
