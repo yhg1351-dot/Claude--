@@ -401,7 +401,7 @@ export function createEditor(container, ctx) {
     const subtabs = [["basics", "기본 정보"], ["schedule", "일정"], ["places", "장소와 미션"]];
     const toolbar = el("div", { class: "ed-toolbar" }, [
       el("div", { class: "ed-toolbar-top" }, [
-        el("div", { class: "tabs" }, subtabs.map(([k, l]) => el("button", { class: k === tab ? "active" : "", onclick: () => { tab = k; render(); window.scrollTo({ top: 0 }); } }, l))),
+        el("div", { class: "tabs sub" }, subtabs.map(([k, l]) => el("button", { class: k === tab ? "active" : "", onclick: () => { tab = k; render(); window.scrollTo({ top: 0 }); } }, l))),
         el("div", { class: "actions" }, [
           el("button", { class: "btn small ghost", onclick: resetToDefault }, "기본 파일로 되돌리기"),
           saveBtn,

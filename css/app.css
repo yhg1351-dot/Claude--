@@ -330,3 +330,28 @@ table.grid tr:last-child td { border-bottom: 0; }
 .rep-bar.rep { background: var(--gold-soft); color: #5a4200; font-weight: 700; }
 .rep-bar .btn.small { flex: none; }
 .submit-wrap .notice { margin-bottom: 10px; }
+
+/* ---------- 버튼 위계 (교사 화면) ---------- */
+/* 1단계 주 메뉴: 분할 막대 */
+.tabs.seg { display: flex; gap: 2px; background: #ece8df; border-radius: 14px; padding: 4px; overflow: visible; margin: 4px 0 14px; }
+.tabs.seg button { flex: 1 1 0; min-width: 0; border: 0; background: transparent; border-radius: 11px; padding: 9px 8px; min-height: 40px; font-size: 15px; font-weight: 800; color: var(--ink-2); white-space: nowrap; }
+.tabs.seg button.active { background: var(--bg-deep); color: #fff; box-shadow: 0 2px 8px rgba(29,36,64,.28); }
+.tabs.seg .short { display: none; }
+@media (max-width: 479.98px) {
+  .tabs.seg button { font-size: 13px; padding: 8px 2px; }
+  .tabs.seg .full { display: none; }
+  .tabs.seg .short { display: inline; }
+}
+/* 2단계 하위 탭: 작은 알약, 선택은 테두리+연한 배경 */
+.tabs.sub { gap: 6px; padding: 0 0 6px; }
+.tabs.sub button { min-height: 34px; padding: 6px 13px; font-size: 14px; font-weight: 700; border: 1.5px solid var(--line); background: #fff; color: var(--ink-2); }
+.tabs.sub button.active { background: var(--indigo-soft); color: var(--indigo); border-color: var(--indigo); }
+/* 3단계 필터: 작은 칩, 선택은 금색 */
+.class-picker { background: rgba(236,232,223,.55); border-radius: 12px; padding: 6px 10px; margin: 0 0 12px; gap: 8px; }
+.filter-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: 1; }
+.filter-chips::-webkit-scrollbar { display: none; }
+.filter-chips button { flex: none; min-height: 30px; padding: 4px 11px; font-size: 13px; font-weight: 700; border: 1px solid #d9d3c4; background: transparent; border-radius: 999px; color: var(--ink-2); }
+.filter-chips button.active { background: var(--gold-soft); color: var(--gold-deep); border-color: var(--gold); }
+/* 4단계 바로가기: 가장 작은 회색 칩 */
+.place-jump .chip.jump { font-size: 12px; padding: 3px 9px; min-height: 26px; }
+.ed-toolbar-top .tabs.sub { padding: 0; }

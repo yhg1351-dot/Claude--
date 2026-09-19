@@ -161,7 +161,8 @@ function viewLogin() {
 }
 
 function viewHeader() {
-  const tabs = [["overview", "현황"], ["byPlace", "장소별 제출"], ["byGroup", "모둠별 제출"], ["edit", "편집"], ["tools", "도구"]];
+  // 1단계 주 메뉴: 분할 막대 (좁은 화면에서는 짧은 이름)
+  const tabs = [["overview", "현황", "현황"], ["byPlace", "장소별 제출", "장소별"], ["byGroup", "모둠별 제출", "모둠별"], ["edit", "편집", "편집"], ["tools", "도구", "도구"]];
   return el("div", { class: "teacher-head" }, [
     el("div", { class: "teacher-top" }, [
       el("h1", {}, "교사 확인 화면"),
@@ -169,10 +170,10 @@ function viewHeader() {
       el("button", { class: "btn small icon", onclick: load, "aria-label": "새로고침", title: "새로고침" }, "↻"),
       el("button", { class: "btn small", onclick: async () => { await backend.teacherLogout(); state.loggedIn = false; render(); } }, "나가기"),
     ]),
-    el("div", { class: "tabs" }, tabs.map(([k, l]) => el("button", { class: k === state.tab ? "active" : "", onclick: () => { state.tab = k; render(); } }, l))),
+    el("div", { class: "tabs seg" }, tabs.map(([k, l, sh]) => el("button", { class: k === state.tab ? "active" : "", onclick: () => { state.tab = k; render(); } }, [el("span", { class: "full" }, l), el("span", { class: "short" }, sh)]))),
     state.tab === "edit" ? null : el("div", { class: "toolbar class-picker" }, [
       el("span", { class: "muted small" }, "반"),
-      el("div", { class: "tabs" }, [
+      el("div", { class: "filter-chips" }, [
         el("button", { class: state.classFilter === "all" ? "active" : "", onclick: () => { state.classFilter = "all"; render(); } }, "전체"),
         ...state.data.trip.classes.map((c) => el("button", { class: state.classFilter === String(c.class) ? "active" : "", onclick: () => { state.classFilter = String(c.class); render(); } }, `${c.class}반`)),
       ]),
@@ -250,7 +251,7 @@ function viewByPlace() {
   const places = missionPlaces();
   if (!state.placeFilter) state.placeFilter = places[0][0];
   const wrap = el("div");
-  wrap.append(el("div", { class: "tabs" }, places.map(([pid, p]) => el("button", { class: pid === state.placeFilter ? "active" : "", onclick: () => { state.placeFilter = pid; render(); } }, p.name))));
+  wrap.append(el("div", { class: "tabs sub" }, places.map(([pid, p]) => el("button", { class: pid === state.placeFilter ? "active" : "", onclick: () => { state.placeFilter = pid; render(); } }, p.name))));
   const p = state.data.places[state.placeFilter];
   const codes = filteredCodes();
   const sm = subMap();
