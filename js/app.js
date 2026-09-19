@@ -421,14 +421,14 @@ function viewHome() {
   return wrap;
 }
 
-// 도장판: 미션마다 칸 하나. 선생님 도장을 받으면 빨간 도장이 찍힌다.
+// 미션 스탬프: 미션마다 칸 하나. 선생님 도장을 받으면 빨간 도장이 찍힌다.
 function viewStampBoard() {
   const ms = allMissionList();
   if (!ms.length) return el("div");
   const ss = stampStats();
   const card = el("div", { class: "card stamp-card" });
   card.append(el("div", { class: "row" }, [
-    el("h2", { style: "margin:0" }, "도장판"),
+    el("h2", { style: "margin:0" }, "미션 스탬프"),
     el("div", { class: "stamp-count" }, [el("strong", {}, String(ss.stamped)), el("span", { class: "muted" }, ` / ${ss.total}`)]),
   ]));
   // 칸 수가 늘어도 두 줄 안팎이 되도록 열 수를 정한다 (한 줄 최대 8칸)
