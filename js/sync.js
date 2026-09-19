@@ -51,6 +51,16 @@ export async function enqueue({ code, placeId, missionId, answer, photos }) {
   return item;
 }
 
+// 대기 중인 항목 하나를 보내지 않고 지운다 (사진 원본도 함께)
+export async function discard(id) {
+  const item = await store.get("outbox", id);
+  if (!item) return false;
+  await store.del("outbox", id);
+  for (const path of item.photoPaths || []) { try { await store.del("photos", path); } catch (e) {} }
+  emit({ type: "idle" });
+  return true;
+}
+
 export async function pending() {
   return (await store.all("outbox")).sort((a, b) => a.createdAt - b.createdAt);
 }

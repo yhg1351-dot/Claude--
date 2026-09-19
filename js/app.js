@@ -2,7 +2,7 @@
 import { store, ls, uuid } from "./store.js";
 import { backend, isConfigured } from "./backend.js";
 import { compressImage } from "./image.js";
-import { enqueue, pending, onSync, startSyncLoop, resumeAfterLogin, kick, retryNow } from "./sync.js";
+import { enqueue, pending, onSync, startSyncLoop, resumeAfterLogin, kick, retryNow, discard } from "./sync.js";
 import { loadTripData } from "./data.js";
 
 const CFG = window.APP_CONFIG || {};
@@ -655,6 +655,21 @@ function viewPendingCard() {
       el("strong", {}, m ? m.title : it.missionId),
       ` · 사진 ${it.photoPaths.length}장 · 시도 ${it.attempts}회`,
       it.lastError ? el("div", { style: "margin-top:4px" }, `오류: ${it.lastError}`) : null,
+      el("div", { style: "margin-top:8px" }, el("button", { class: "btn small ghost danger", onclick: async () => {
+        const ok = await modal({
+          title: "이 제출을 지울까요?",
+          body: `'${m ? m.title : it.missionId}' 제출을 보내지 않고 지웁니다. 필요하면 미션에서 다시 제출할 수 있어요.`,
+          buttons: [{ label: "취소", value: false }, { label: "지우기", value: true, kind: "primary" }],
+        });
+        if (!ok) return;
+        await discard(it.id);
+        // 아직 서버에 가지 않은 제출이면 '제출함' 표시도 되돌린다
+        const pr = state.progress[it.missionId];
+        if (pr && pr.status !== "sent") { delete state.progress[it.missionId]; saveProgress(); }
+        await refreshPending();
+        toast("전송 대기 항목을 지웠어요.", "ok", 2000);
+        render();
+      } }, "보내지 않고 지우기")),
     ]));
   }
   card.append(el("button", { class: "btn", onclick: async () => { syncMsg = "📤 다시 보내는 중…"; renderStatus(); await retryNow(); } }, "지금 다시 보내기"));
