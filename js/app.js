@@ -352,17 +352,50 @@ const root = () => $("#app");
 
 function render() {
   rememberRoute();
-  const r = route();
   const app = root();
-  app.innerHTML = "";
-  if (r.name === "login") app.append(viewLogin());
-  else if (r.name === "home") app.append(viewHome());
-  else if (r.name === "place") app.append(viewPlace(r.placeId));
-  else if (r.name === "mission") app.append(viewMission(r.placeId, r.missionId));
-  else if (r.name === "certificate") app.append(viewCertificate());
+  try {
+    const r = route();
+    app.innerHTML = "";
+    if (r.name === "login") app.append(viewLogin());
+    else if (r.name === "home") app.append(viewHome());
+    else if (r.name === "place") app.append(viewPlace(r.placeId));
+    else if (r.name === "mission") app.append(viewMission(r.placeId, r.missionId));
+    else if (r.name === "certificate") app.append(viewCertificate());
+    else app.append(viewHome());
+  } catch (e) {
+    // 화면을 그리다 오류가 나면 빈 화면 대신 복구 카드를 보여 준다
+    app.innerHTML = "";
+    app.append(errorCard(e));
+    return;
+  }
   renderStatus();
   window.scrollTo(0, 0);
 }
+
+// ------------------------------------------------------------ 오류 복구
+function errorCard(e) {
+  const msg = (e && (e.message || String(e))) || "알 수 없는 오류";
+  return el("div", { class: "card", style: "margin-top:24px" }, [
+    el("h2", {}, "화면을 여는 데 문제가 생겼어요"),
+    el("p", { class: "muted" }, "아래 버튼을 누르면 이 폰에 저장된 앱 정보를 지우고 처음부터 다시 엽니다. 제출한 내용은 서버에 남아 있어요."),
+    el("div", { class: "row", style: "margin-top:12px" }, [
+      el("button", { class: "btn primary", onclick: () => location.reload() }, "다시 열기"),
+      el("button", { class: "btn", onclick: resetApp }, "처음부터 다시 열기"),
+    ]),
+    el("p", { class: "muted small", style: "margin-top:12px;word-break:break-all" }, `오류 내용: ${msg}`),
+  ]);
+}
+// 저장된 앱 정보(세션·캐시·서비스 워커)를 모두 지우고 새로 연다. 서버의 제출 기록은 그대로다.
+async function resetApp() {
+  try { Object.keys(localStorage).filter((k) => k.startsWith("mq-")).forEach((k) => localStorage.removeItem(k)); } catch (e) {}
+  try { if (window.caches) for (const k of await caches.keys()) await caches.delete(k); } catch (e) {}
+  try { if (navigator.serviceWorker) for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); } catch (e) {}
+  location.replace(location.pathname);
+}
+// 화면이 비어 있는 채로 스크립트 오류가 나면 복구 카드를 띄운다
+let booted = false;
+window.addEventListener("error", (ev) => { if (!booted || !root().firstChild) { root().innerHTML = ""; root().append(errorCard(ev.error || ev.message)); } });
+window.addEventListener("unhandledrejection", (ev) => { if (!booted || !root().firstChild) { root().innerHTML = ""; root().append(errorCard(ev.reason)); } });
 
 function heroSkyline() {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -848,11 +881,31 @@ async function refreshPending() {
 
 // ------------------------------------------------------------ 시작
 async function init() {
+  // 8초가 지나도 첫 화면이 안 열리면 안내와 초기화 버튼을 보여 준다
+  const slow = setTimeout(() => {
+    if (booted) return;
+    root().append(el("div", { class: "card", style: "text-align:center" }, [
+      el("p", { class: "muted", style: "margin:0 0 10px" }, "신호가 약해 오래 걸리고 있어요. 조금 더 기다리거나 다시 열어 주세요."),
+      el("div", { class: "row", style: "justify-content:center" }, [
+        el("button", { class: "btn small", onclick: () => location.reload() }, "다시 열기"),
+        el("button", { class: "btn small ghost", onclick: resetApp }, "처음부터 다시 열기"),
+      ]),
+    ]));
+  }, 8000);
   try {
     state.data = (await loadTripData()).data;
   } catch (e) {
     // 캐시된 파일이 없고 오프라인이면 안내
-    root().innerHTML = '<div class="card"><h2>미션 정보를 불러오지 못했어요</h2><p class="muted">인터넷이 연결된 곳에서 다시 열어 주세요.</p></div>';
+    clearTimeout(slow);
+    root().innerHTML = "";
+    root().append(el("div", { class: "card" }, [
+      el("h2", {}, "미션 정보를 불러오지 못했어요"),
+      el("p", { class: "muted" }, "인터넷이 연결된 곳에서 다시 열어 주세요."),
+      el("div", { class: "row", style: "margin-top:12px" }, [
+        el("button", { class: "btn primary", onclick: () => location.reload() }, "다시 열기"),
+        el("button", { class: "btn", onclick: resetApp }, "처음부터 다시 열기"),
+      ]),
+    ]));
     return;
   }
   state.session = ls.get("mq-session");
@@ -885,11 +938,12 @@ async function init() {
     } catch (e) {}
   });
 
+  clearTimeout(slow);
+  booted = true;
   render();
   await refreshPending();
   startSyncLoop();
   startHeartbeat();
   if (state.session) { heartbeat(); pullProgress(); }
-
 }
-init();
+init().catch((e) => { root().innerHTML = ""; root().append(errorCard(e)); });

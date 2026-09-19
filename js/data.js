@@ -16,7 +16,7 @@ export async function loadTripData({ preferServer = true } = {}) {
   let cached = ls.get(CACHE_KEY);
   if (preferServer && navigator.onLine) {
     try {
-      const r = await backend.loadConfig();
+      const r = await Promise.race([backend.loadConfig(), new Promise((res) => setTimeout(() => res({ ok: false, reason: "timeout" }), 12000))]);
       if (r.ok && r.data && r.data.trip && r.data.places) {
         cached = { data: r.data, updatedAt: r.updatedAt };
         ls.set(CACHE_KEY, cached);

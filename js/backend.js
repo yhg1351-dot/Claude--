@@ -72,13 +72,18 @@ function makeSupabase() {
 
     // ----- 일정·미션 설정 (교사가 편집, 학생은 읽기만)
     async loadConfig() {
+      // 신호가 약해 응답이 없으면 10초 뒤 포기하고 캐시·기본 파일을 쓰게 한다
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 10000);
       try {
-        const { data, error } = await client.from("app_config").select("data, updated_at").eq("id", "trip").maybeSingle();
+        const { data, error } = await client.from("app_config").select("data, updated_at").eq("id", "trip").abortSignal(ctrl.signal).maybeSingle();
         if (error) return { ok: false, reason: "network", message: error.message };
         if (!data) return { ok: true, data: null, updatedAt: null };
         return { ok: true, data: data.data, updatedAt: data.updated_at };
       } catch (e) {
         return netErr(e);
+      } finally {
+        clearTimeout(timer);
       }
     },
     async saveConfig(data, expectedUpdatedAt) {
