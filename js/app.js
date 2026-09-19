@@ -26,6 +26,7 @@ const state = {
   data: null,         // missions.json
   session: null,      // { code, token, deviceId }
   progress: {},       // missionId -> { status, answer, photoCount, at }
+  stamps: {},         // missionId -> created_at (선생님 도장)
   pendingCount: 0,
   online: navigator.onLine,
   draft: {},          // 미션 화면 입력 중인 내용
@@ -62,7 +63,25 @@ function clearDraft(placeId, missionId) {
   delete state.draft[draftKeyOf(placeId, missionId)];
   if (state.session) store.del("drafts", `${state.session.code}:${missionId}`).catch(() => {});
 }
-function loadProgress() { state.progress = state.session ? ls.get(progressKey(), {}) : {}; }
+function loadProgress() {
+  state.progress = state.session ? ls.get(progressKey(), {}) : {};
+  state.stamps = state.session ? ls.get(`mq-stamps-${state.session.code}`, {}) : {};
+}
+function saveStamps() { if (state.session) ls.set(`mq-stamps-${state.session.code}`, state.stamps); }
+function allMissionList() {
+  const out = [];
+  for (const day of (state.data.trip.days || [])) for (const st of day.stops || []) {
+    const p = place(st.placeId);
+    if (p && p.type === "mission") for (const m of p.missions || []) if (!out.find((x) => x.id === m.id)) out.push({ ...m, placeId: st.placeId, placeName: p.name });
+  }
+  for (const [pid, p] of Object.entries(state.data.places)) if (p.type === "mission") for (const m of p.missions || []) if (!out.find((x) => x.id === m.id)) out.push({ ...m, placeId: pid, placeName: p.name });
+  return out;
+}
+function stampStats() {
+  const ms = allMissionList();
+  const stamped = ms.filter((m) => state.stamps[m.id]).length;
+  return { stamped, total: ms.length, complete: ms.length > 0 && stamped === ms.length };
+}
 function saveProgress() { if (state.session) ls.set(progressKey(), state.progress); }
 function place(id) { return state.data.places[id]; }
 function missionsOf(placeId) { return (place(placeId) && place(placeId).missions) || []; }
@@ -178,6 +197,15 @@ async function pullProgress() {
   const r = isRep() ? await backend.getProgress(state.session.token) : await backend.getGroupProgress(state.session.code);
   if (!r.ok || !Array.isArray(r.submissions)) return;
   if (r.rep) state.repInfo = r.rep;
+  if (Array.isArray(r.stamps)) {
+    const before = Object.keys(state.stamps).length;
+    state.stamps = {};
+    for (const st of r.stamps) state.stamps[st.mission_id] = st.created_at || true;
+    saveStamps();
+    const added = Object.keys(state.stamps).length - before;
+    if (added > 0 && before >= 0 && state.stampsLoadedOnce) toast(`🎉 선생님 도장 ${added}개를 새로 받았어요!`, "ok", 3500);
+    state.stampsLoadedOnce = true;
+  }
   const queued = new Set((await pending()).map((i) => i.missionId));
   const onServer = new Set(r.submissions.map((s) => s.mission_id));
   for (const s of r.submissions) {
@@ -203,6 +231,7 @@ function route() {
   if (!state.session) return { name: "login" };
   if (parts[0] === "place" && parts[1] && place(parts[1])) return { name: "place", placeId: parts[1] };
   if (parts[0] === "mission" && parts[1] && findMission(parts[1], parts[2])) return { name: "mission", placeId: parts[1], missionId: parts[2] };
+  if (parts[0] === "certificate" && stampStats().complete) return { name: "certificate" };
   return { name: "home" };
 }
 function go(hash) { location.hash = hash; }
@@ -255,6 +284,7 @@ function render() {
   else if (r.name === "home") app.append(viewHome());
   else if (r.name === "place") app.append(viewPlace(r.placeId));
   else if (r.name === "mission") app.append(viewMission(r.placeId, r.missionId));
+  else if (r.name === "certificate") app.append(viewCertificate());
   renderStatus();
   window.scrollTo(0, 0);
 }
@@ -341,6 +371,7 @@ function viewHome() {
     ringEl(tp.done, tp.total),
   ]));
   wrap.append(viewRepCard());
+  wrap.append(viewStampBoard());
   if (state.pendingItems && state.pendingItems.length) wrap.append(viewPendingCard());
   for (const day of state.data.trip.days) {
     wrap.append(el("div", { class: "day-title" }, day.label || `${day.day}일차`));
@@ -387,6 +418,82 @@ function viewHome() {
       if (ok) logoutLocal();
     } }, "여기를 누르세요"),
   ]));
+  return wrap;
+}
+
+// 도장판: 미션마다 칸 하나. 선생님 도장을 받으면 빨간 도장이 찍힌다.
+function viewStampBoard() {
+  const ms = allMissionList();
+  if (!ms.length) return el("div");
+  const ss = stampStats();
+  const card = el("div", { class: "card stamp-card" });
+  card.append(el("div", { class: "row" }, [
+    el("h2", { style: "margin:0" }, "도장판"),
+    el("div", { class: "stamp-count" }, [el("strong", {}, String(ss.stamped)), el("span", { class: "muted" }, ` / ${ss.total}`)]),
+  ]));
+  const grid = el("div", { class: "stamp-grid" });
+  ms.forEach((m, i) => {
+    const st = state.stamps[m.id] ? "stamped" : state.progress[m.id] ? "pending" : "";
+    grid.append(el("button", { class: `stamp-slot ${st}`, title: m.title, onclick: () => go(`#/mission/${m.placeId}/${m.id}`) }, [
+      st === "stamped" ? el("span", { class: "seal" }, "도장") : st === "pending" ? el("span", { class: "wait" }, "검토 중") : el("span", { class: "no" }, String(i + 1)),
+      el("span", { class: "lbl" }, m.title),
+    ]));
+  });
+  card.append(grid);
+  if (ss.complete) {
+    card.append(el("div", { class: "notice ok", style: "margin-top:12px" }, "🏆 모든 미션에 도장을 받았어요! 수학여행 완주!"));
+    card.append(el("button", { class: "btn gold", onclick: () => go("#/certificate") }, "완주 인증서 보기"));
+  } else {
+    card.append(el("p", { class: "muted small", style: "margin:10px 0 0" }, "제출한 미션을 선생님이 확인하면 도장이 찍혀요. 모든 칸을 채우면 완주 인증서를 받아요!"));
+  }
+  return card;
+}
+
+// 완주 인증서
+function certificateSvg() {
+  const t = state.data.trip;
+  const code = state.session.code;
+  const group = `${code[0]}학년 ${code[1]}반 ${parseInt(code.slice(2), 10)}모둠`;
+  const ss = stampStats();
+  const d = new Date();
+  const date = `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 500" width="720" height="500" font-family="-apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif">
+  <rect width="720" height="500" fill="#fbf7ec"/>
+  <rect x="18" y="18" width="684" height="464" fill="none" stroke="#d4a72c" stroke-width="6"/>
+  <rect x="30" y="30" width="660" height="440" fill="none" stroke="#d4a72c" stroke-width="1.5"/>
+  <circle cx="360" cy="96" r="34" fill="#e0b34a"/><circle cx="360" cy="96" r="26" fill="#fbf1d6"/>
+  <text x="360" y="105" text-anchor="middle" font-size="26" font-weight="800" fill="#b98a1e">★</text>
+  <text x="360" y="170" text-anchor="middle" font-size="34" font-weight="900" fill="#1d2440" letter-spacing="6">완주 인증서</text>
+  <text x="360" y="204" text-anchor="middle" font-size="16" fill="#6b7280">${esc(t.title)}</text>
+  <text x="360" y="268" text-anchor="middle" font-size="30" font-weight="900" fill="#1d2440">${esc(group)}</text>
+  <text x="360" y="316" text-anchor="middle" font-size="16" fill="#1c2033">위 모둠은 수학여행 미션 ${ss.total}개를 모두 해내고</text>
+  <text x="360" y="342" text-anchor="middle" font-size="16" fill="#1c2033">선생님 도장 ${ss.stamped}개를 받았기에 이 인증서를 드립니다.</text>
+  <text x="360" y="410" text-anchor="middle" font-size="15" fill="#4b5068">${esc(date)}</text>
+  <text x="360" y="444" text-anchor="middle" font-size="17" font-weight="800" fill="#1d2440">${esc(t.title)} 선생님 일동</text>
+  <circle cx="600" cy="420" r="34" fill="none" stroke="#d9483b" stroke-width="3" opacity=".85"/>
+  <text x="600" y="427" text-anchor="middle" font-size="16" font-weight="900" fill="#d9483b" opacity=".85">완주</text>
+</svg>`;
+}
+function viewCertificate() {
+  const wrap = el("div");
+  wrap.append(el("div", { class: "topbar" }, [el("button", { class: "back", onclick: () => go("#/") }, "‹"), el("h1", {}, "완주 인증서")]));
+  const holder = el("div", { class: "cert-holder", html: certificateSvg() });
+  wrap.append(el("div", { class: "card", style: "padding:10px" }, holder));
+  wrap.append(el("button", { class: "btn gold", onclick: async () => {
+    try {
+      const svg = new Blob([certificateSvg()], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(svg);
+      const img = new Image();
+      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+      const c = document.createElement("canvas"); c.width = 1440; c.height = 1000;
+      c.getContext("2d").drawImage(img, 0, 0, 1440, 1000);
+      URL.revokeObjectURL(url);
+      const a = el("a", { href: c.toDataURL("image/png"), download: `완주인증서_${state.session.code}.png` });
+      document.body.append(a); a.click(); a.remove();
+    } catch (e) { toast("이미지 저장에 실패했어요. 화면을 캡처해 주세요.", "error", 3500); }
+  } }, "이미지로 저장"));
+  wrap.append(el("p", { class: "muted small", style: "text-align:center" }, "저장이 안 되면 화면을 캡처해도 돼요."));
   return wrap;
 }
 
@@ -473,7 +580,7 @@ function viewPlace(placeId) {
     wrap.append(el("button", { class: `mission-item ${cls}`, onclick: () => go(`#/mission/${placeId}/${m.id}`) }, [
       el("div", { class: "idx" }, st ? "✓" : String(i + 1)),
       el("div", { class: "body" }, [el("div", { class: "t" }, m.title), el("div", { class: "w" }, [typeIcon(m.type), " ", m.where || ""])]),
-      label ? el("span", { class: `chip st ${st.status === "sent" ? "ok" : "warn"}` }, label) : el("span", { class: "st arrow" }, "›"),
+      state.stamps[m.id] ? el("span", { class: "st seal-mini" }, "도장") : label ? el("span", { class: `chip st ${st.status === "sent" ? "ok" : "warn"}` }, label) : el("span", { class: "st arrow" }, "›"),
     ]));
   });
   return wrap;
@@ -497,7 +604,8 @@ function viewMission(placeId, missionId) {
   card.append(el("div", { class: "kind" }, [typeIcon(m.type), " ", m.type === "photo" ? "사진 미션" : m.type === "choice" ? "퀴즈" : "생각 쓰기"]));
   card.append(el("h2", {}, m.title));
   if (m.where) card.append(el("div", { class: "where" }, [el("span", {}, "📍"), el("span", {}, [el("strong", {}, "어디서 "), m.where])]));
-  if (prev) card.append(el("div", { class: `notice ${prev.status === "sent" ? "ok" : "warn"}` }, prev.status === "sent" ? "✓ 제출 완료! 다시 제출하면 새 내용으로 바뀌어요." : "⏳ 저장됨. 인터넷이 연결되면 자동으로 보내요. 다시 제출하면 새 내용으로 바뀌어요."));
+  if (state.stamps[m.id]) card.append(el("div", { class: "notice ok stamped-notice" }, [el("span", { class: "seal-mini" }, "도장"), " 선생님 도장을 받았어요!"]));
+  else if (prev) card.append(el("div", { class: `notice ${prev.status === "sent" ? "ok" : "warn"}` }, prev.status === "sent" ? "✓ 제출 완료! 선생님이 확인하면 도장이 찍혀요. 다시 제출하면 새 내용으로 바뀌어요." : "⏳ 저장됨. 인터넷이 연결되면 자동으로 보내요. 다시 제출하면 새 내용으로 바뀌어요."));
   if (m.image) card.append(el("div", { class: "img-card", style: "margin:10px 0" }, el("img", { src: m.image, alt: "미션 사진", loading: "lazy" })));
   card.append(el("div", { class: "question" }, m.question || ""));
   if (m.hint) card.append(el("details", { class: "hint" }, [el("summary", {}, "힌트 보기"), el("p", {}, m.hint)]));

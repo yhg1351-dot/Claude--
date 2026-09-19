@@ -28,6 +28,9 @@ const state = {
   placeFilter: null,
   submissions: [],
   sessions: [],
+  stamps: [],
+  stampsUnavailable: false,
+  onlyUnstamped: false,
   urls: {},
   loadedAt: null,
   error: null,
@@ -84,13 +87,62 @@ async function load() {
   if (!r.ok) { state.error = r.message || "불러오기 실패"; render(); return; }
   state.submissions = r.submissions || [];
   state.sessions = r.sessions || [];
+  state.stamps = r.stamps || [];
+  state.stampsUnavailable = !!r.stampsUnavailable;
   state.error = null;
   state.loadedAt = new Date();
+  await backfillAutoStamps();
   const paths = [];
   for (const s of state.submissions) for (const p of s.photo_paths || []) if (!state.urls[p]) paths.push(p);
   if (paths.length) Object.assign(state.urls, await backend.signedUrls(paths));
   render();
 }
+// 도장 도우미
+function stampKey(code, mid) { return `${code}:${mid}`; }
+function stampMap() { const m = new Map(); for (const s of state.stamps) m.set(stampKey(s.group_code, s.mission_id), s); return m; }
+function allMissions() { return missionPlaces().flatMap(([, p]) => p.missions || []); }
+function stampCount(code) { const sm = stampMap(); return allMissions().filter((m) => sm.has(stampKey(code, m.id))).length; }
+// 퀴즈 정답인데 도장이 없는 제출에 자동 도장 (서버 함수가 못 찍은 경우의 보완)
+async function backfillAutoStamps() {
+  if (state.stampsUnavailable) return;
+  const sm = stampMap();
+  const todo = [];
+  for (const s of state.submissions) {
+    const m = missionById(s.mission_id);
+    if (!m || m.type !== "choice" || sm.has(stampKey(s.group_code, s.mission_id))) continue;
+    if (s.answer && s.answer.choice === m.answer) todo.push(s);
+  }
+  for (const s of todo) {
+    const r = await backend.setStamp(s.group_code, s.mission_id, true, { auto: true });
+    if (r.ok) state.stamps.push({ group_code: s.group_code, mission_id: s.mission_id, auto: true, created_at: new Date().toISOString() });
+  }
+}
+async function toggleStamp(s, btn) {
+  const sm = stampMap();
+  const has = sm.has(stampKey(s.group_code, s.mission_id));
+  if (btn) btn.disabled = true;
+  const r = await backend.setStamp(s.group_code, s.mission_id, !has);
+  if (!r.ok) { alert(`도장 저장 실패: ${r.message || ""}`); if (btn) btn.disabled = false; return; }
+  if (has) state.stamps = state.stamps.filter((x) => stampKey(x.group_code, x.mission_id) !== stampKey(s.group_code, s.mission_id));
+  else state.stamps.push({ group_code: s.group_code, mission_id: s.mission_id, auto: false, created_at: new Date().toISOString() });
+  render();
+}
+function stampControls(s) {
+  const st = stampMap().get(stampKey(s.group_code, s.mission_id));
+  const row = el("div", { class: "stamp-row" });
+  if (st) {
+    row.append(el("span", { class: "chip ok" }, st.auto ? "✓ 도장 (정답 자동)" : "✓ 도장 찍힘"));
+    row.append(el("button", { class: "btn small ghost danger", onclick: (e) => toggleStamp(s, e.currentTarget) }, "지우기"));
+  } else {
+    row.append(el("button", { class: "btn small stamp-btn", onclick: (e) => toggleStamp(s, e.currentTarget) }, "도장 찍기"));
+  }
+  return row;
+}
+function unstampedFilter() {
+  return el("button", { class: `btn small ${state.onlyUnstamped ? "gold" : ""}`, onclick: () => { state.onlyUnstamped = !state.onlyUnstamped; render(); } }, state.onlyUnstamped ? "도장 안 찍힌 것만 보는 중" : "도장 안 찍힌 것만 보기");
+}
+function isStamped(s) { return stampMap().has(stampKey(s.group_code, s.mission_id)); }
+
 let refreshTimer = null;
 function startAutoRefresh() {
   if (refreshTimer) return;
@@ -188,16 +240,16 @@ function viewOverview() {
   const sessByCode = new Map(state.sessions.map((s) => [s.code, s]));
   const totalMissions = places.reduce((n, [, p]) => n + (p.missions || []).length, 0);
   const active = codes.filter((c) => sessionStatus(sessByCode.get(c)).cls === "ok").length;
-  const submittedGroups = codes.filter((c) => subsFor(c).length > 0).length;
+  const unstamped = state.submissions.filter((s) => codes.includes(s.group_code) && !isStamped(s)).length;
   const photoCount = state.submissions.filter((s) => codes.includes(s.group_code)).reduce((n, s) => n + (s.photo_paths || []).length, 0);
 
   const wrap = el("div");
   wrap.append(el("div", { class: "kpis" }, [
-    kpi(`${active}/${codes.length}`, "대표 폰 접속 중 / 모둠"), kpi(`${submittedGroups}`, "제출 시작한 모둠"),
+    kpi(`${active}/${codes.length}`, "대표 폰 접속 중 / 모둠"), kpi(`${unstamped}`, "도장 안 찍힌 제출"),
     kpi(state.submissions.filter((s) => codes.includes(s.group_code)).length, `제출 건수 (최대 ${totalMissions * codes.length})`), kpi(photoCount, "사진 수"),
   ]));
 
-  const thead = el("tr", {}, [el("th", {}, "모둠"), el("th", {}, "접속"), ...places.map(([, p]) => el("th", { class: "num" }, p.name)), el("th", {}, "최근 제출")]);
+  const thead = el("tr", {}, [el("th", {}, "모둠"), el("th", {}, "접속"), ...places.map(([, p]) => el("th", { class: "num" }, p.name)), el("th", { class: "num" }, "도장"), el("th", {}, "최근 제출")]);
   const rows = codes.map((code) => {
     const s = sessByCode.get(code);
     const st = sessionStatus(s);
@@ -219,6 +271,7 @@ function viewOverview() {
         const cls = done === 0 ? "cell-none" : done === total ? "cell-ok" : "cell-partial";
         return el("td", { class: `num ${cls}` }, `${done}/${total}`);
       }),
+      el("td", { class: `num ${stampCount(code) === totalMissions && totalMissions > 0 ? "cell-ok" : stampCount(code) ? "cell-partial" : "cell-none"}` }, `${stampCount(code)}/${totalMissions}${stampCount(code) === totalMissions && totalMissions > 0 ? " 🏆" : ""}`),
       el("td", { class: "muted" }, last ? fmtTime(last) : "-"),
     ]);
   });
@@ -239,7 +292,8 @@ function viewOverview() {
       const done = (p.missions || []).filter((m) => sm.has(`${code}:${m.id}`)).length;
       return el("div", { class: "pl" }, [el("div", { class: "n" }, p.name), el("div", { class: "v" }, `${done}/${total}`), el("div", { class: "mini" }, el("i", { style: `width:${total ? (done / total) * 100 : 0}%` }))]);
     }));
-    cards.append(el("div", { class: "group-card" }, [hd, pls]));
+    const sc = stampCount(code);
+    cards.append(el("div", { class: "group-card" }, [hd, pls, el("div", { class: "muted small", style: "margin-top:8px" }, `도장 ${sc}/${totalMissions}${sc === totalMissions && totalMissions > 0 ? " 🏆 완주" : ""}`)]));
   }
   wrap.append(cards);
   wrap.append(el("p", { class: "muted small" }, `모둠원은 누구나 앱을 볼 수 있고, 제출은 모둠이 정한 '대표 폰' 한 대만 합니다. "대표 접속 중"은 최근 ${CFG.lockTimeoutMinutes || 5}분 안에 대표 폰 신호가 있음, "대표 신호 끊김"은 다른 폰이 대표를 이어받을 수 있는 상태. '해제'를 누르면 바로 다른 폰이 대표가 될 수 있습니다. 30초마다 자동 갱신.`));
@@ -252,14 +306,16 @@ function viewByPlace() {
   if (!state.placeFilter) state.placeFilter = places[0][0];
   const wrap = el("div");
   wrap.append(el("div", { class: "tabs sub" }, places.map(([pid, p]) => el("button", { class: pid === state.placeFilter ? "active" : "", onclick: () => { state.placeFilter = pid; render(); } }, p.name))));
+  wrap.append(el("div", { class: "tool-row", style: "margin:4px 0 8px" }, unstampedFilter()));
   const p = state.data.places[state.placeFilter];
   const codes = filteredCodes();
   const sm = subMap();
   for (const m of p.missions || []) {
     const card = el("div", { class: "card" });
-    const submitted = codes.filter((c) => sm.has(`${c}:${m.id}`));
+    const submittedAll = codes.filter((c) => sm.has(`${c}:${m.id}`));
+    const submitted = state.onlyUnstamped ? submittedAll.filter((c) => !isStamped(sm.get(`${c}:${m.id}`))) : submittedAll;
     const missing = codes.filter((c) => !sm.has(`${c}:${m.id}`));
-    card.append(el("h2", {}, [m.title, " ", el("span", { class: "chip gray" }, `${submitted.length}/${codes.length} 제출`)]));
+    card.append(el("h2", {}, [m.title, " ", el("span", { class: "chip gray" }, `${submittedAll.length}/${codes.length} 제출`), state.onlyUnstamped ? el("span", { class: "chip warn" }, `도장 대기 ${submitted.length}`) : null]));
     card.append(el("p", { class: "muted small q-text" }, m.question));
     if (m.type === "choice") card.append(el("p", { class: "muted small" }, `정답: ${m.options[m.answer]}`));
     if (missing.length) {
@@ -280,13 +336,14 @@ function viewByGroup() {
   const wrap = el("div");
   const sel = el("select", { onchange: (e) => { state.groupSel = e.target.value; render(); } }, codes.map((c) => el("option", { value: c, selected: state.groupSel === c ? "" : null }, `${codeLabel(c)} (${subsFor(c).length}건)`)));
   if (!state.groupSel || !codes.includes(state.groupSel)) state.groupSel = codes[0];
-  wrap.append(el("div", { class: "toolbar" }, [el("label", { class: "muted small" }, "모둠: "), sel]));
+  wrap.append(el("div", { class: "toolbar" }, [el("label", { class: "muted small" }, "모둠: "), sel, unstampedFilter()]));
   for (const [pid, p] of missionPlaces()) {
     const card = el("div", { class: "card" });
     card.append(el("h2", {}, [p.emoji ? `${p.emoji} ` : "", p.name]));
     for (const m of p.missions || []) {
       const s = sm.get(`${state.groupSel}:${m.id}`);
-      if (!s) { card.append(el("div", { class: "sub-card", style: "opacity:.6" }, [el("div", { class: "hdr" }, [el("strong", {}, m.title), el("span", { class: "chip gray" }, "미제출")])])); continue; }
+      if (!s) { if (!state.onlyUnstamped) card.append(el("div", { class: "sub-card", style: "opacity:.6" }, [el("div", { class: "hdr" }, [el("strong", {}, m.title), el("span", { class: "chip gray" }, "미제출")])])); continue; }
+      if (state.onlyUnstamped && isStamped(s)) continue;
       card.append(subCard(s, m, false));
     }
     wrap.append(card);
@@ -311,6 +368,7 @@ function subCard(s, m, showGroup) {
       return img;
     })));
   }
+  if (!state.stampsUnavailable) card.append(stampControls(s));
   return card;
 }
 function lightbox(url, filename) {
@@ -372,6 +430,7 @@ function viewTools() {
   wrap.append(el("div", { class: "card" }, [
     el("h2", {}, "운영 안내"),
     el("ul", { class: "muted small" }, [
+      el("li", {}, "도장: 제출 카드의 '도장 찍기'를 누르면 학생 도장판에 바로 표시됩니다. 퀴즈 정답은 자동으로 찍히고, 모든 미션에 도장이 찍히면 학생 앱에 완주 인증서가 열립니다."),
       el("li", {}, "모둠의 대표 폰을 바꿔야 할 때: 현황 탭에서 해당 모둠의 '해제' 버튼을 누르면 새 폰에서 바로 '대표 폰으로 정하기'를 누를 수 있습니다."),
       el("li", {}, "사진이 안 보일 때: 학생 폰이 아직 전송 중일 수 있습니다. 신호가 잡히면 자동으로 올라옵니다."),
       el("li", {}, "미션 내용 수정: 저장소의 data/missions.json 파일을 고치면 1~2분 뒤 반영됩니다."),

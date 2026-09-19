@@ -125,13 +125,15 @@ function makeSupabase() {
     teacherLogout: () => client.auth.signOut({ scope: "local" }),
     async fetchAll() {
       try {
-        const [subs, sess] = await Promise.all([
+        const [subs, sess, st] = await Promise.all([
           client.from("submissions").select("*").order("updated_at", { ascending: false }).limit(5000),
           client.from("group_sessions").select("*"),
+          client.from("stamps").select("*").limit(10000),
         ]);
         if (subs.error) return { ok: false, reason: "network", message: subs.error.message };
         if (sess.error) return { ok: false, reason: "network", message: sess.error.message };
-        return { ok: true, submissions: subs.data, sessions: sess.data };
+        // 도장 표가 아직 없으면(SQL 미실행) 빈 목록으로 진행
+        return { ok: true, submissions: subs.data, sessions: sess.data, stamps: st.error ? [] : st.data, stampsUnavailable: !!st.error };
       } catch (e) {
         return netErr(e);
       }
@@ -146,6 +148,21 @@ function makeSupabase() {
         for (const d of data) if (d.signedUrl) out[d.path] = d.signedUrl;
       }
       return out;
+    },
+    // 도장 찍기/지우기 (교사)
+    async setStamp(code, missionId, on, opts = {}) {
+      try {
+        if (on) {
+          const { error } = await client.from("stamps").upsert({ group_code: code, mission_id: missionId, auto: !!opts.auto }, { onConflict: "group_code,mission_id", ignoreDuplicates: true });
+          if (error) return { ok: false, message: error.message };
+        } else {
+          const { error } = await client.from("stamps").delete().eq("group_code", code).eq("mission_id", missionId);
+          if (error) return { ok: false, message: error.message };
+        }
+        return { ok: true };
+      } catch (e) {
+        return netErr(e);
+      }
     },
     async releaseGroup(code) {
       const { error } = await client
@@ -183,7 +200,10 @@ function makeSupabase() {
 // 이 기기 브라우저 안에서만 동작. 실제 서버 없이 앱 흐름을 확인하기 위한 용도.
 function makeLocal() {
   const KEY = "mq-local-sessions";
+  const STAMP_KEY = "mq-local-stamps";
   const timeoutMs = (CFG.lockTimeoutMinutes || 5) * 60 * 1000;
+  const stampsAll = () => ls.get(STAMP_KEY, {});
+  const stampsFor = (code) => Object.entries(stampsAll()).filter(([k]) => k.startsWith(`${code}:`)).map(([k, v]) => ({ group_code: code, mission_id: k.slice(code.length + 1), auto: !!v.auto, created_at: v.created_at }));
   const sessions = () => ls.get(KEY, {});
   const save = (s) => ls.set(KEY, s);
 
@@ -218,13 +238,13 @@ function makeLocal() {
       const s = Object.values(all).find((x) => x.token === token);
       if (!s) return { ok: false, reason: "invalid" };
       const rows = (await store.all("localSubmissions")).filter((r) => r.group_code === s.code);
-      return { ok: true, submissions: rows };
+      return { ok: true, submissions: rows, stamps: stampsFor(s.code) };
     },
     async getGroupProgress(code) {
       const s = sessions()[code];
       const rows = (await store.all("localSubmissions")).filter((r) => r.group_code === code)
         .map((r) => ({ mission_id: r.mission_id, place_id: r.place_id, photo_count: (r.photo_paths || []).length, updated_at: r.updated_at }));
-      return { ok: true, submissions: rows, rep: { exists: !!s, active: !!s && Date.now() - s.last_seen < timeoutMs, last_seen: s ? s.last_seen : null } };
+      return { ok: true, submissions: rows, stamps: stampsFor(code), rep: { exists: !!s, active: !!s && Date.now() - s.last_seen < timeoutMs, last_seen: s ? s.last_seen : null } };
     },
     async uploadPhoto(code, path, blob) {
       await store.put("photos", { key: path, blob, code });
@@ -287,7 +307,16 @@ function makeLocal() {
         last_seen: new Date(s.last_seen).toISOString(),
         claimed_at: new Date(s.claimed_at).toISOString(),
       }));
-      return { ok: true, submissions, sessions: sess };
+      const stamps = Object.entries(stampsAll()).map(([k, v]) => { const [code, ...rest] = k.split(":"); return { group_code: code, mission_id: rest.join(":"), auto: !!v.auto, created_at: v.created_at }; });
+      return { ok: true, submissions, sessions: sess, stamps };
+    },
+    async setStamp(code, missionId, on, opts = {}) {
+      const all = stampsAll();
+      const k = `${code}:${missionId}`;
+      if (on) { if (!all[k]) all[k] = { auto: !!opts.auto, created_at: new Date().toISOString() }; }
+      else delete all[k];
+      ls.set(STAMP_KEY, all);
+      return { ok: true };
     },
     async signedUrls(paths) {
       const out = {};
@@ -307,6 +336,7 @@ function makeLocal() {
       await store.clear("localSubmissions");
       await store.clear("photos");
       ls.remove(KEY);
+      ls.remove(STAMP_KEY);
       return { ok: true };
     },
   };
