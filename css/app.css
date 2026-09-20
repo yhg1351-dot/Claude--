@@ -271,7 +271,11 @@ table.grid tr:last-child td { border-bottom: 0; }
 
 /* ---------- 이미지 카드 ---------- */
 .img-card { padding: 0; overflow: hidden; }
-.img-card img { display: block; width: 100%; max-height: 320px; object-fit: cover; border-radius: var(--radius); }
+.img-card img { display: block; width: 100%; height: auto; border-radius: var(--radius); cursor: zoom-in; }
+.img-card .zoom-hint { position: absolute; right: 10px; bottom: 10px; background: rgba(20,24,40,.62); color: #fff; font-size: 12px; font-weight: 700; padding: 5px 9px; border-radius: 999px; pointer-events: none; }
+.img-card { position: relative; }
+.lightbox.scroll { display: block; overflow: auto; -webkit-overflow-scrolling: touch; padding: 12px 0 90px; }
+.lightbox.scroll img { display: block; width: 100%; max-width: none; max-height: none; height: auto; border-radius: 0; }
 
 /* ---------- 교사 편집 화면 ---------- */
 .editor .card h2 { display: flex; align-items: center; gap: 8px; }

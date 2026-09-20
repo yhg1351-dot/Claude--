@@ -661,6 +661,24 @@ function viewPendingCard() {
   return card;
 }
 
+// 안내·미션 이미지: 잘리지 않게 전체를 보여 주고, 누르면 화면 가득 크게 본다 (두 손가락으로 확대 가능)
+function imageCard(src, alt, cls, style) {
+  const img = el("img", { src, alt, loading: "lazy" });
+  const card = el("div", { class: cls, style: style || "" }, [img, el("span", { class: "zoom-hint" }, "🔍 누르면 크게")]);
+  card.addEventListener("click", () => openImage(src, alt));
+  return card;
+}
+function openImage(src, alt) {
+  const big = el("img", { src, alt });
+  const bar = el("div", { class: "lb-bar" }, [
+    el("button", { class: "btn small", onclick: (e) => { e.stopPropagation(); window.open(src, "_blank", "noopener"); } }, "원본 크기로 열기"),
+    el("button", { class: "btn small primary", onclick: (e) => { e.stopPropagation(); lb.remove(); } }, "닫기"),
+  ]);
+  const lb = el("div", { class: "lightbox scroll" }, [big, bar]);
+  lb.addEventListener("click", (e) => { if (e.target === lb) lb.remove(); });
+  document.body.append(lb);
+}
+
 function viewPlace(placeId) {
   const p = place(placeId);
   const wrap = el("div");
@@ -674,7 +692,7 @@ function viewPlace(placeId) {
     el("div", { class: "emoji" }, p.emoji || "📍"),
     el("div", {}, [el("div", { class: "t" }, p.name), el("div", { class: "d" }, ms.length ? `미션 ${ms.length}개` : "안내")]),
   ]));
-  if (p.image) wrap.append(el("div", { class: "card img-card" }, el("img", { src: p.image, alt: p.name, loading: "lazy" })));
+  if (p.image) wrap.append(imageCard(p.image, p.name, "card img-card"));
   if (p.intro) wrap.append(el("div", { class: "card" }, el("p", { class: "intro" }, p.intro)));
   if (!ms.length) return wrap;
   const pr = placeProgress(placeId);
@@ -718,7 +736,7 @@ function viewMission(placeId, missionId) {
   if (m.where) card.append(el("div", { class: "where" }, [el("span", {}, "📍"), el("span", {}, [el("strong", {}, "어디서 "), m.where])]));
   if (state.stamps[m.id]) card.append(el("div", { class: "notice ok stamped-notice" }, [el("span", { class: "seal-mini" }, "도장"), " 선생님 도장을 받았어요!"]));
   else if (prev) card.append(el("div", { class: `notice ${prev.status === "sent" ? "ok" : "warn"}` }, prev.status === "sent" ? "✓ 제출 완료! 선생님이 확인하면 도장이 찍혀요. 다시 제출하면 새 내용으로 바뀌어요." : "⏳ 저장됨. 인터넷이 연결되면 자동으로 보내요. 다시 제출하면 새 내용으로 바뀌어요."));
-  if (m.image) card.append(el("div", { class: "img-card", style: "margin:10px 0" }, el("img", { src: m.image, alt: "미션 사진", loading: "lazy" })));
+  if (m.image) card.append(imageCard(m.image, "미션 사진", "img-card", "margin:10px 0"));
   card.append(el("div", { class: "question" }, m.question || ""));
   if (m.hint) card.append(el("details", { class: "hint" }, [el("summary", {}, "힌트 보기"), el("p", {}, m.hint)]));
 

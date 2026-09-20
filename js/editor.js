@@ -70,7 +70,7 @@ export function createEditor(container, ctx) {
       if (!f) return;
       status.textContent = " 올리는 중…";
       try {
-        const blob = await compressImage(f, { maxSide: 1600, quality: 0.85, maxBytes: 400 * 1024 });
+        const blob = await compressImage(f, { maxSide: 2400, quality: 0.88, maxBytes: 900 * 1024 });
         const r = await backend.uploadAsset(`${pathPrefix}-${Date.now()}.jpg`, blob);
         if (!r.ok) throw new Error(r.message || "업로드 실패");
         onChange(r.url);
