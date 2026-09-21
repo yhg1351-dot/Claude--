@@ -1,5 +1,6 @@
 // 교사 확인 화면: 로그인 후 제출 현황, 답변과 사진, 접속 해제, CSV 내려받기, 전체 삭제.
 import { backend, isConfigured } from "./backend.js";
+import { setupPwa, installButton, inAppNotice } from "./pwa.js";
 import { loadTripData, orderedPlaceIds } from "./data.js";
 import { createEditor } from "./editor.js";
 
@@ -220,9 +221,11 @@ function viewLogin() {
   };
   btn.addEventListener("click", doLogin);
   pw.addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+  const ib = installButton({ label: "📲 이 폰에 교사 화면 설치", title: "교사 화면을 홈 화면에 추가하기" });
   return el("div", { style: "max-width:420px;margin:40px auto" }, el("div", { class: "card" }, [
     el("h2", {}, "교사 확인 화면"),
     el("p", { class: "muted" }, state.data.trip.title),
+    inAppNotice("사진 저장과 홈 화면 설치가 잘 안 될 수 있으니 크롬이나 사파리로 열어 주세요."),
     !isConfigured ? el("div", { class: "notice info small" }, "데모 모드: 이 기기에서 제출한 내용만 보입니다. 비밀번호는 config.js의 localTeacherPassword 값입니다.") : null,
     isConfigured && !simple ? el("div", { class: "field" }, email) : null,
     el("div", { class: "field" }, [simple ? el("label", {}, "교사 코드를 입력하세요") : null, pw]),
@@ -231,6 +234,7 @@ function viewLogin() {
       ? el("p", { class: "muted small", style: "margin-top:12px;text-align:center" }, el("a", { href: "#", onclick: (e) => { e.preventDefault(); state.useEmailLogin = !state.useEmailLogin; render(); } }, simple ? "다른 계정으로 로그인" : "교사 코드로 로그인"))
       : null,
     el("p", { class: "muted small", style: "text-align:center" }, "한 번 로그인하면 이 기기에서는 계속 유지됩니다."),
+    ib ? el("div", { class: "install-row", style: "text-align:center" }, [ib, el("p", { class: "muted small", style: "margin:6px 0 0" }, "여행 중에는 홈 화면 아이콘으로 바로 여는 게 편해요.")]) : null,
   ]));
 }
 
@@ -459,6 +463,12 @@ function viewTools() {
       else { alert("모두 삭제했습니다."); state.urls = {}; state.urlAt = {}; state.urlMissing = {}; load(); }
     } }, "학생 데이터 전체 삭제"),
   ]));
+  { const n = inAppNotice("사진 저장과 홈 화면 설치가 잘 안 될 수 있으니 크롬이나 사파리로 열어 주세요."); const ib = installButton({ label: "📲 이 폰에 교사 화면 설치", title: "교사 화면을 홈 화면에 추가하기" });
+    if (n || ib) wrap.append(el("div", { class: "card" }, [
+      el("h2", {}, "이 폰에 설치"),
+      el("p", { class: "muted" }, "홈 화면에 교사 화면 아이콘을 추가하면 여행 중에 주소를 찾지 않아도 바로 열 수 있습니다. 로그인은 그대로 유지됩니다."),
+      n, ib ? el("div", { class: "install-row" }, ib) : null,
+    ])); }
   wrap.append(el("div", { class: "card" }, [
     el("h2", {}, "운영 안내"),
     el("ul", { class: "muted small" }, [
@@ -530,6 +540,7 @@ function downloadCsv() {
 }
 
 // ------------------------------------------------------------ 시작
+setupPwa({ onChange: () => { if (state.data) render(); } });
 async function init() {
   const loaded = await loadTripData();
   state.data = loaded.data; state.dataUpdatedAt = loaded.updatedAt; state.dataSource = loaded.source;

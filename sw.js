@@ -1,6 +1,6 @@
 // 서비스 워커: 앱 파일을 폰에 캐시해 신호가 약해도 화면이 열리게 한다.
 // 네트워크 우선(최신 파일), 실패하면 캐시 사용. Supabase 요청은 건드리지 않는다.
-const VERSION = "mq-v24";
+const VERSION = "mq-v25";
 const PRECACHE = [
   "./",
   "./index.html",
@@ -15,6 +15,8 @@ const PRECACHE = [
   "./js/image.js",
   "./js/data.js",
   "./js/editor.js",
+  "./js/pwa.js",
+  "./manifest-teacher.webmanifest",
   "./data/missions.json",
   "./vendor/supabase.js",
   "./vendor/fflate.js",
@@ -52,7 +54,8 @@ self.addEventListener("fetch", (event) => {
         if (res && res.ok) cache.put(req, res.clone());
         return res;
       } catch (e) {
-        const cached = (await cache.match(req, { ignoreSearch: true })) || (req.mode === "navigate" ? await cache.match("./index.html") : null);
+        const fallback = url.pathname.endsWith("/teacher.html") ? "./teacher.html" : "./index.html";
+        const cached = (await cache.match(req, { ignoreSearch: true })) || (req.mode === "navigate" ? await cache.match(fallback) : null);
         if (cached) return cached;
         throw e;
       }
