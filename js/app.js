@@ -189,8 +189,8 @@ async function heartbeat() {
 }
 function startHeartbeat() {
   if (hbTimer) return;
-  hbTimer = setInterval(() => { if (document.visibilityState === "visible") heartbeat(); }, (CFG.heartbeatSeconds || 60) * 1000);
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") heartbeat(); });
+  hbTimer = setInterval(() => { if (document.visibilityState === "visible") { heartbeat(); pullProgress(); } }, (CFG.heartbeatSeconds || 60) * 1000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { heartbeat(); pullProgress(); } });
 }
 // 서버에 저장된 제출 내역을 받아 로컬 진행 상태와 합친다 (기기가 바뀌어도 진행 상태 유지)
 async function pullProgress() {
@@ -222,7 +222,24 @@ async function pullProgress() {
     if (state.progress[mid].status === "sent" && !onServer.has(mid) && !queued.has(mid)) delete state.progress[mid];
   }
   saveProgress();
-  render();
+  // 화면은 내용이 실제로 바뀌었을 때만 다시 그린다 (1분마다 받아오므로 입력 중인 화면을 건드리지 않게)
+  const sig = JSON.stringify([state.progress, state.stamps, state.repInfo]);
+  const changed = sig !== progressSig;
+  progressSig = sig;
+  maybeShowCertificate();
+  if (changed && route().name !== "mission") render();
+}
+let progressSig = "";
+// 모든 미션에 도장을 받은 순간(모둠당 한 번) 인증서 화면으로 이동한다. 미션 입력 중이면 나온 뒤에 연다.
+function maybeShowCertificate() {
+  if (!state.session || !stampStats().complete) return;
+  const key = `mq-cert-shown-${state.session.code}`;
+  if (ls.get(key)) return;
+  if (route().name === "mission") { state.certPending = true; return; }
+  ls.set(key, true);
+  state.certPending = false;
+  toast("🎉 모든 미션에 도장을 받았어요! 완주 인증서를 확인하세요.", "ok", 4000);
+  go("#/certificate");
 }
 
 // ------------------------------------------------------------ 라우팅
@@ -260,6 +277,7 @@ const root = () => $("#app");
 function render() {
   rememberRoute();
   const app = root();
+  if (state.certPending && route().name !== "mission" && route().name !== "login") { maybeShowCertificate(); }
   try {
     const r = route();
     app.innerHTML = "";
@@ -479,22 +497,52 @@ function certificateSvg() {
   const ss = stampStats();
   const d = new Date();
   const date = `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
-  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 500" width="720" height="500" font-family="-apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif">
-  <rect width="720" height="500" fill="#fbf7ec"/>
-  <rect x="18" y="18" width="684" height="464" fill="none" stroke="#d4a72c" stroke-width="6"/>
-  <rect x="30" y="30" width="660" height="440" fill="none" stroke="#d4a72c" stroke-width="1.5"/>
-  <circle cx="360" cy="96" r="34" fill="#e0b34a"/><circle cx="360" cy="96" r="26" fill="#fbf1d6"/>
-  <text x="360" y="105" text-anchor="middle" font-size="26" font-weight="800" fill="#b98a1e">★</text>
-  <text x="360" y="170" text-anchor="middle" font-size="34" font-weight="900" fill="#1d2440" letter-spacing="6">완주 인증서</text>
-  <text x="360" y="204" text-anchor="middle" font-size="16" fill="#6b7280">${esc(t.title)}</text>
-  <text x="360" y="268" text-anchor="middle" font-size="30" font-weight="900" fill="#1d2440">${esc(group)}</text>
-  <text x="360" y="316" text-anchor="middle" font-size="16" fill="#1c2033">위 모둠은 수학여행 미션 ${ss.total}개를 모두 해내고</text>
-  <text x="360" y="342" text-anchor="middle" font-size="16" fill="#1c2033">선생님 도장 ${ss.stamped}개를 받았기에 이 인증서를 드립니다.</text>
-  <text x="360" y="410" text-anchor="middle" font-size="15" fill="#4b5068">${esc(date)}</text>
-  <text x="360" y="444" text-anchor="middle" font-size="17" font-weight="800" fill="#1d2440">${esc(t.title)} 선생님 일동</text>
-  <circle cx="600" cy="420" r="34" fill="none" stroke="#d9483b" stroke-width="3" opacity=".85"/>
-  <text x="600" y="427" text-anchor="middle" font-size="16" font-weight="900" fill="#d9483b" opacity=".85">완주</text>
+  const esc = (x) => String(x).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  // 받은 도장을 한 줄 최대 12개씩 작은 원으로 그린다
+  const n = ss.total, perRow = Math.min(12, Math.max(1, n)), rows = Math.ceil(n / perRow);
+  const gap = 32, r = 12;
+  let seals = "";
+  for (let i = 0; i < n; i++) {
+    const row = Math.floor(i / perRow), col = i % perRow;
+    const inRow = row === rows - 1 ? n - row * perRow : perRow;
+    const x = 240 + (col - (inRow - 1) / 2) * gap, y = 372 + row * 30;
+    seals += `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="#d9483b" stroke-width="1.6" opacity=".85"/><text x="${x}" y="${y + 3}" text-anchor="middle" font-size="8" font-weight="900" fill="#d9483b" opacity=".9">도장</text>`;
+  }
+  const shift = (rows - 1) * 30; // 도장이 두 줄 이상이면 아래 내용을 그만큼 내린다
+  const H = 720 + shift;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 ${H}" width="480" height="${H}" font-family="-apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif">
+  <defs>
+    <linearGradient id="cNavy" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#25305a"/><stop offset="1" stop-color="#1d2440"/></linearGradient>
+    <linearGradient id="cGold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f1d27a"/><stop offset=".5" stop-color="#c9982a"/><stop offset="1" stop-color="#e9c866"/></linearGradient>
+  </defs>
+  <rect width="480" height="${H}" fill="#fbf7ec"/>
+  <path d="M0 0 H480 V150 Q240 200 0 150 Z" fill="url(#cNavy)"/>
+  <path d="M0 120 L40 120 L48 100 L56 120 L100 120 L100 112 L116 100 L132 112 L132 120 L200 120 L206 96 L212 86 L218 96 L224 120 L300 120 L308 108 L316 120 L380 120 L384 106 L392 96 L400 106 L404 120 L480 120 L480 150 Q240 200 0 150 Z" fill="rgba(255,255,255,.10)"/>
+  <text x="240" y="52" text-anchor="middle" font-size="12" fill="#c9d0ea" letter-spacing="3">GYEONGJU FIELD TRIP</text>
+  <text x="240" y="92" text-anchor="middle" font-size="30" font-weight="900" fill="#fff" letter-spacing="6">완주 인증서</text>
+  <circle cx="240" cy="172" r="44" fill="#fbf7ec"/><circle cx="240" cy="172" r="38" fill="url(#cGold)"/><circle cx="240" cy="172" r="29" fill="#fff7dd"/>
+  <text x="240" y="183" text-anchor="middle" font-size="28" font-weight="800" fill="#b98a1e">★</text>
+  <text x="240" y="262" text-anchor="middle" font-size="34" font-weight="900" fill="#1d2440">${esc(group)}</text>
+  <text x="240" y="300" text-anchor="middle" font-size="15" fill="#1c2033">${esc(t.title)} 미션 ${ss.total}개를 모두 해내고</text>
+  <text x="240" y="324" text-anchor="middle" font-size="15" fill="#1c2033">선생님 도장 ${ss.stamped}개를 받았습니다.</text>
+  ${seals}
+  <g transform="translate(0 ${shift})">
+    <line x1="24" y1="416" x2="456" y2="416" stroke="#c9982a" stroke-width="1.5" stroke-dasharray="6 5"/>
+    <circle cx="24" cy="416" r="9" fill="#fbf7ec" stroke="#c9982a" stroke-width="1.5"/><circle cx="456" cy="416" r="9" fill="#fbf7ec" stroke="#c9982a" stroke-width="1.5"/>
+    <rect x="36" y="440" width="408" height="150" rx="16" fill="#fff" stroke="url(#cGold)" stroke-width="3"/>
+    <rect x="36" y="440" width="408" height="44" rx="16" fill="url(#cGold)"/>
+    <rect x="36" y="470" width="408" height="14" fill="url(#cGold)"/>
+    <text x="240" y="469" text-anchor="middle" font-size="16" font-weight="900" fill="#1d2440" letter-spacing="3">쿠우쿠우 입장권</text>
+    <text x="240" y="520" text-anchor="middle" font-size="22" font-weight="900" fill="#1d2440">쿠우쿠우 입장 가능</text>
+    <text x="240" y="546" text-anchor="middle" font-size="13" fill="#4b5068">2일차 점심 · 이 화면을 선생님께 보여 주고 입장하세요.</text>
+    <text x="240" y="572" text-anchor="middle" font-size="12" fill="#8a8f9e">${esc(group)} · ${esc(date)} 발급</text>
+    <text x="240" y="640" text-anchor="middle" font-size="15" font-weight="800" fill="#1d2440">${esc(t.title)} 선생님 일동</text>
+    <g transform="rotate(-12 396 640)">
+      <circle cx="396" cy="640" r="34" fill="none" stroke="#d9483b" stroke-width="3" opacity=".85"/>
+      <circle cx="396" cy="640" r="27" fill="none" stroke="#d9483b" stroke-width="1.2" opacity=".85"/>
+      <text x="396" y="646" text-anchor="middle" font-size="15" font-weight="900" fill="#d9483b" opacity=".9">완주</text>
+    </g>
+  </g>
 </svg>`;
 }
 function viewCertificate() {
@@ -502,14 +550,15 @@ function viewCertificate() {
   wrap.append(el("div", { class: "topbar" }, [el("button", { class: "back", onclick: () => go("#/") }, "‹"), el("h1", {}, "완주 인증서")]));
   const holder = el("div", { class: "cert-holder", html: certificateSvg() });
   wrap.append(el("div", { class: "card", style: "padding:10px" }, holder));
+  wrap.append(el("div", { class: "notice ok", style: "text-align:center" }, "🎉 모든 미션을 완주했어요! 2일차 점심에 이 화면을 선생님께 보여 주세요."));
   wrap.append(el("button", { class: "btn gold", onclick: async () => {
     try {
       const svg = new Blob([certificateSvg()], { type: "image/svg+xml;charset=utf-8" });
       const url = URL.createObjectURL(svg);
       const img = new Image();
       await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
-      const c = document.createElement("canvas"); c.width = 1440; c.height = 1000;
-      c.getContext("2d").drawImage(img, 0, 0, 1440, 1000);
+      const c = document.createElement("canvas"); c.width = img.width * 2; c.height = img.height * 2;
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(url);
       const a = el("a", { href: c.toDataURL("image/png"), download: `완주인증서_${state.session.code}.png` });
       document.body.append(a); a.click(); a.remove();
