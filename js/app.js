@@ -645,7 +645,10 @@ function viewMission(placeId, missionId) {
   card.append(el("h2", {}, m.title));
   if (m.where) card.append(el("div", { class: "where" }, [el("span", {}, "📍"), el("span", {}, [el("strong", {}, "어디서 "), m.where])]));
   if (state.stamps[m.id]) card.append(el("div", { class: "notice ok stamped-notice" }, [el("span", { class: "seal-mini" }, "도장"), " 선생님 도장을 받았어요!"]));
-  else if (prev) card.append(el("div", { class: `notice ${prev.status === "sent" ? "ok" : "warn"}` }, prev.status === "sent" ? "✓ 제출 완료! 선생님이 확인하면 도장이 찍혀요. 다시 제출하면 새 내용으로 바뀌어요." : "⏳ 저장됨. 인터넷이 연결되면 자동으로 보내요. 다시 제출하면 새 내용으로 바뀌어요."));
+  else if (prev) {
+    const tail = m.type === "photo" ? "사진을 더하거나 빼고 다시 제출할 수 있어요." : "다시 제출하면 새 내용으로 바뀌어요.";
+    card.append(el("div", { class: `notice ${prev.status === "sent" ? "ok" : "warn"}` }, prev.status === "sent" ? `✓ 제출 완료! 선생님이 확인하면 도장이 찍혀요. ${tail}` : `⏳ 저장됨. 인터넷이 연결되면 자동으로 보내요. ${tail}`));
+  }
   if (m.image) card.append(imageCard(m.image, "미션 사진", "img-card", "margin:10px 0"));
   card.append(el("div", { class: "question" }, m.question || ""));
   if (m.hint) card.append(el("details", { class: "hint" }, [el("summary", {}, "힌트 보기"), el("p", {}, m.hint)]));
