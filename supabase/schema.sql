@@ -179,7 +179,7 @@ begin
   if p_mission_id is null or length(p_mission_id) > 64 or p_place_id is null or length(p_place_id) > 64 then
     return jsonb_build_object('ok', false, 'reason', 'invalid');
   end if;
-  if coalesce(array_length(p_photo_paths, 1), 0) > 5 then
+  if coalesce(array_length(p_photo_paths, 1), 0) > 6 then
     return jsonb_build_object('ok', false, 'reason', 'invalid');
   end if;
   -- 사진 경로는 반드시 자기 모둠 폴더 안이어야 한다
@@ -324,7 +324,7 @@ begin
   if p_mission_id is null or length(p_mission_id) > 64 or p_place_id is null or length(p_place_id) > 64 then
     return jsonb_build_object('ok', false, 'reason', 'invalid');
   end if;
-  if coalesce(array_length(p_photo_paths, 1), 0) > 5 then
+  if coalesce(array_length(p_photo_paths, 1), 0) > 6 then
     return jsonb_build_object('ok', false, 'reason', 'invalid');
   end if;
   foreach p in array coalesce(p_photo_paths, '{}') loop

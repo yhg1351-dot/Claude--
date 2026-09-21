@@ -33,6 +33,7 @@ const state = {
   onlyUnstamped: false,
   urls: {},
   urlAt: {}, // 사진 임시 주소를 받은 시각
+  urlMissing: {}, // 서버에 없는 미리보기 경로 (다시 묻지 않음)
   loadedAt: null,
   error: null,
 };
@@ -102,12 +103,22 @@ async function refreshPhotoUrls() {
   const now = Date.now();
   const paths = [];
   for (const s of state.submissions) for (const p of s.photo_paths || []) {
-    if (!state.urls[p] || !state.urlAt[p] || now - state.urlAt[p] > URL_TTL_MS) paths.push(p);
+    // 원본과 목록용 작은 미리보기(_t) 주소를 함께 받는다. 미리보기가 없는 옛 사진은 원본으로 대신한다.
+    for (const q of [p, thumbPath(p)]) {
+      if (state.urlMissing[q]) continue;
+      if (!state.urls[q] || !state.urlAt[q] || now - state.urlAt[q] > URL_TTL_MS) paths.push(q);
+    }
   }
   if (!paths.length) return;
   const fresh = await backend.signedUrls(paths);
-  for (const [p, u] of Object.entries(fresh)) { state.urls[p] = u; state.urlAt[p] = now; }
+  for (const q of paths) {
+    if (fresh[q]) { state.urls[q] = fresh[q]; state.urlAt[q] = now; }
+    else if (q.endsWith("_t.jpg")) state.urlMissing[q] = true; // 미리보기 없음 → 다시 묻지 않음
+  }
 }
+function thumbPath(p) { return p.replace(/\.jpg$/, "_t.jpg"); }
+// 목록에 보여 줄 주소: 작은 미리보기가 있으면 그것, 없으면 원본
+function listUrl(p) { return state.urls[thumbPath(p)] || state.urls[p]; }
 // 도장 도우미
 function stampKey(code, mid) { return `${code}:${mid}`; }
 function stampMap() { const m = new Map(); for (const s of state.stamps) m.set(stampKey(s.group_code, s.mission_id), s); return m; }
@@ -373,8 +384,9 @@ function subCard(s, m, showGroup) {
   const paths = s.photo_paths || [];
   if (paths.length) {
     card.append(el("div", { class: "thumbs" }, paths.map((p) => {
-      const url = state.urls[p];
-      const img = el("img", { src: url || "", alt: "제출 사진", loading: "lazy", onclick: () => url && lightbox(url, photoFileName(s, m, paths.indexOf(p))) });
+      const url = listUrl(p);
+      const full = state.urls[p] || url; // 크게 보기와 저장은 원본
+      const img = el("img", { src: url || "", alt: "제출 사진", loading: "lazy", onclick: () => full && lightbox(full, photoFileName(s, m, paths.indexOf(p))) });
       if (!url) img.style.opacity = ".3";
       return img;
     })));
@@ -419,11 +431,20 @@ function viewTools() {
   const withPhotos = state.submissions.filter((s) => codes.includes(s.group_code) && (s.photo_paths || []).length);
   const photoTotal = withPhotos.reduce((n, s) => n + s.photo_paths.length, 0);
   const prog = el("div", { class: "muted small", style: "margin-top:8px" });
-  const zipBtn = el("button", { class: "btn wide-auto", onclick: () => downloadZip(withPhotos, prog, zipBtn) }, `사진 ${photoTotal}장 ZIP으로 내려받기`);
+  const scopeLabel = state.classFilter === "all" ? "전체" : `${state.classFilter}반`;
+  const estMb = Math.round(photoTotal * 0.5);
+  const zipBtn = el("button", { class: "btn wide-auto", onclick: () => downloadZip(withPhotos, prog, zipBtn) }, `${scopeLabel} 사진 ${photoTotal}장 ZIP으로 내려받기`);
   if (!photoTotal) zipBtn.disabled = true;
+  const scopeChips = el("div", { class: "filter-chips zip-scope", style: "margin:8px 0" }, [
+    el("button", { class: state.classFilter === "all" ? "active" : "", onclick: () => { state.classFilter = "all"; render(); } }, "전체"),
+    ...state.data.trip.classes.map((c) => el("button", { class: state.classFilter === String(c.class) ? "active" : "", onclick: () => { state.classFilter = String(c.class); render(); } }, `${c.class}반`)),
+  ]);
   wrap.append(el("div", { class: "card" }, [
     el("h2", {}, "사진 내려받기"),
-    el("p", { class: "muted" }, `제출된 사진을 반·모둠 폴더로 정리한 ZIP 파일로 저장합니다. 위의 "반" 선택으로 범위를 좁힐 수 있습니다. (현재 ${state.classFilter === "all" ? "전체" : state.classFilter + "반"}: ${withPhotos.length}건, ${photoTotal}장)`),
+    el("p", { class: "muted" }, "제출된 사진(원본 화질)을 반·모둠 폴더로 정리한 ZIP 파일로 저장합니다. 범위를 고르세요."),
+    scopeChips,
+    el("p", { class: "muted small" }, `${scopeLabel}: ${withPhotos.length}건, ${photoTotal}장, 약 ${estMb}MB`),
+    photoTotal > 200 ? el("div", { class: "notice warn small" }, "사진이 많습니다. 폰에서는 메모리가 부족해 실패할 수 있으니 PC에서 받거나 반별로 나눠 받으세요.") : null,
     zipBtn, prog,
     el("p", { class: "muted small" }, "사진 한 장만 저장하려면 장소별·모둠별 제출에서 사진을 눌러 크게 본 뒤 '이 사진 저장'을 누르세요."),
   ]));
@@ -435,7 +456,7 @@ function viewTools() {
       if (typed !== "삭제") return;
       const r = await backend.deleteAll();
       if (!r.ok) alert(`삭제 실패: ${r.message || ""}`);
-      else { alert("모두 삭제했습니다."); state.urls = {}; state.urlAt = {}; load(); }
+      else { alert("모두 삭제했습니다."); state.urls = {}; state.urlAt = {}; state.urlMissing = {}; load(); }
     } }, "학생 데이터 전체 삭제"),
   ]));
   wrap.append(el("div", { class: "card" }, [

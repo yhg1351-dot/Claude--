@@ -246,7 +246,7 @@ export function createEditor(container, ctx) {
     }
     if (m.type === "photo") {
       card.append(el("div", { class: "ed-row two" }, [
-        field("최대 사진 수", m.maxPhotos || 1, (v) => { m.maxPhotos = Math.max(1, Math.min(3, v || 1)); }, { type: "number", min: 1, max: 3 }),
+        field("최대 사진 수 (1~6)", m.maxPhotos || 1, (v) => { m.maxPhotos = Math.max(1, Math.min(6, v || 1)); }, { type: "number", min: 1, max: 6 }),
         field("사진과 함께 적을 내용 (비우면 사진만)", m.caption, (v) => { m.caption = v; }, { placeholder: "예: 고른 탑의 이름을 적어 주세요." }),
       ]));
     }

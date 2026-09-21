@@ -178,17 +178,22 @@ function makeSupabase() {
     },
     async deleteAll() {
       try {
-        // 1) 저장소의 모든 사진 삭제 (모둠 폴더 → 파일)
+        // 1) 저장소의 모든 사진 삭제 (모둠 폴더 → 미션 폴더 → 파일, 깊이에 상관없이 모두)
         const bucket = client.storage.from("photos");
-        const top = await bucket.list("", { limit: 1000 });
-        if (top.error) return { ok: false, message: top.error.message };
-        for (const folder of top.data || []) {
-          if (folder.id) continue; // 파일이면 건너뜀 (폴더는 id가 null)
-          const files = await bucket.list(folder.name, { limit: 1000 });
-          const paths = (files.data || []).filter((f) => f.id).map((f) => `${folder.name}/${f.name}`);
-          for (let i = 0; i < paths.length; i += 100) {
-            await bucket.remove(paths.slice(i, i + 100));
+        const paths = [];
+        const walk = async (prefix) => {
+          const r = await bucket.list(prefix, { limit: 1000 });
+          if (r.error) throw new Error(r.error.message);
+          for (const f of r.data || []) {
+            const full = prefix ? `${prefix}/${f.name}` : f.name;
+            if (f.id) paths.push(full); // 파일 (폴더는 id가 null)
+            else await walk(full);
           }
+        };
+        await walk("");
+        for (let i = 0; i < paths.length; i += 100) {
+          const r = await bucket.remove(paths.slice(i, i + 100));
+          if (r.error) return { ok: false, message: r.error.message };
         }
         // 2) 제출 내용과 접속 정보 삭제
         const r = await client.rpc("teacher_delete_all");

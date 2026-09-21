@@ -772,23 +772,27 @@ function viewMission(placeId, missionId) {
     photoGrid = el("div", { class: "photos" });
     // 카메라로 바로 찍기 / 앨범에서 고르기 두 가지 입력
     const fileInput = el("input", { type: "file", accept: "image/*", capture: "environment", class: "sr-only" });
-    const galleryInput = el("input", { type: "file", accept: "image/*", class: "sr-only" });
+    const galleryInput = el("input", { type: "file", accept: "image/*", class: "sr-only", multiple: max > 1 ? "multiple" : undefined });
     const onPick = (input) => async () => {
-      const f = input.files && input.files[0];
+      const files = Array.from(input.files || []);
       input.value = "";
-      if (!f) return;
-      if (draft.photos.length >= max) return;
-      const busy = el("div", { class: "ph" }, el("div", { style: "display:grid;place-items:center;height:100%" }, el("span", { class: "spinner" })));
-      photoGrid.prepend(busy);
-      try {
-        const blob = await compressImage(f, CFG.photo || {});
-        draft.photos.push(blob);
-        saveDraft(placeId, missionId);
-      } catch (e) {
-        console.error(e);
-        toast("사진을 읽지 못했어요. 다른 사진으로 다시 시도해 주세요.", "error");
+      if (!files.length) return;
+      const room = max - draft.photos.length;
+      if (room <= 0) return;
+      if (files.length > room) toast(`사진은 최대 ${max}장까지예요. 앞의 ${room}장만 넣었어요.`, "warn", 3000);
+      for (const f of files.slice(0, room)) {
+        const busy = el("div", { class: "ph" }, el("div", { style: "display:grid;place-items:center;height:100%" }, el("span", { class: "spinner" })));
+        photoGrid.prepend(busy);
+        try {
+          const blob = await compressImage(f, CFG.photo || {});
+          draft.photos.push(blob);
+          saveDraft(placeId, missionId);
+        } catch (e) {
+          console.error(e);
+          toast("사진을 읽지 못했어요. 다른 사진으로 다시 시도해 주세요.", "error");
+        }
+        renderPhotos();
       }
-      renderPhotos();
     };
     fileInput.addEventListener("change", onPick(fileInput));
     galleryInput.addEventListener("change", onPick(galleryInput));
@@ -842,7 +846,10 @@ function viewMission(placeId, missionId) {
     }
     submitBtn.disabled = true; submitBtn.innerHTML = '<span class="spinner"></span> 저장 중';
     try {
-      await enqueue({ code: state.session.code, placeId, missionId: m.id, answer, photos: draft.photos });
+      // 교사 화면 목록용 작은 미리보기(약 30KB)를 함께 만든다. 실패해도 제출은 진행한다.
+      let thumbs = [];
+      try { thumbs = await Promise.all(draft.photos.map((b) => compressImage(b, { maxSide: 360, quality: 0.7, maxBytes: 40 * 1024 }))); } catch (e) { thumbs = []; }
+      await enqueue({ code: state.session.code, placeId, missionId: m.id, answer, photos: draft.photos, thumbs });
       state.progress[m.id] = { status: "queued", answer, photoCount: draft.photos.length, at: new Date().toISOString() };
       saveProgress();
       clearDraft(placeId, missionId);

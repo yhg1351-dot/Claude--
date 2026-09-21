@@ -22,9 +22,13 @@ let blockedByToken = false;
 export function photoPath(code, missionId, submissionId, index) {
   return `${code}/${missionId}/${submissionId}_${index}.jpg`;
 }
+// 교사 화면 목록용 작은 미리보기 사진의 경로 (원본 옆에 _t 를 붙임)
+export function thumbPath(path) {
+  return path.replace(/\.jpg$/, "_t.jpg");
+}
 
-// 새 제출을 대기열에 넣는다. photos: Blob[]
-export async function enqueue({ code, placeId, missionId, answer, photos }) {
+// 새 제출을 대기열에 넣는다. photos: Blob[], thumbs: Blob[] (photos와 같은 순서의 작은 미리보기, 선택)
+export async function enqueue({ code, placeId, missionId, answer, photos, thumbs }) {
   const id = uuid();
   // 같은 미션의 이전 대기 항목은 새 제출로 대체된다
   const existing = (await store.all("outbox")).filter((i) => i.code === code && i.missionId === missionId);
@@ -37,6 +41,7 @@ export async function enqueue({ code, placeId, missionId, answer, photos }) {
   for (let i = 0; i < (photos || []).length; i++) {
     const path = photoPath(code, missionId, id, i);
     await store.put("photos", { key: path, blob: photos[i], code, missionId, createdAt: Date.now() });
+    if (thumbs && thumbs[i]) await store.put("photos", { key: thumbPath(path), blob: thumbs[i], code, missionId, createdAt: Date.now() });
     photoPaths.push(path);
   }
   const item = {
@@ -60,7 +65,7 @@ export async function purgeStale(beforeIso) {
   for (const item of await store.all("outbox")) {
     if (!(item.createdAt < cutoff)) continue;
     await store.del("outbox", item.id);
-    for (const path of item.photoPaths || []) { try { await store.del("photos", path); } catch (e) {} }
+    for (const path of item.photoPaths || []) { try { await store.del("photos", path); await store.del("photos", thumbPath(path)); } catch (e) {} }
     removed.push(item.missionId);
   }
   return removed;
@@ -106,6 +111,12 @@ async function sendItem(item, token) {
     emit({ type: "uploading", missionId: item.missionId, index: i, total: item.photoPaths.length });
     const r = await backend.uploadPhoto(item.code, item.photoPaths[i], row.blob);
     if (!r.ok) return r;
+    // 작은 미리보기도 함께 올린다 (없으면 교사 화면이 원본을 대신 보여 주므로 생략 가능)
+    const t = await store.get("photos", thumbPath(item.photoPaths[i]));
+    if (t && t.blob) {
+      const rt = await backend.uploadPhoto(item.code, thumbPath(item.photoPaths[i]), t.blob);
+      if (!rt.ok) return rt;
+    }
     item.uploaded[i] = true;
     await store.put("outbox", item);
   }
