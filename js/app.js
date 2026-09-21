@@ -726,7 +726,9 @@ function viewMission(placeId, missionId) {
     if (prev && prev.photoCount) {
       const prevGrid = el("div", { class: "photos" });
       store.all("photos").then((rows) => {
-        rows.filter((r) => r.key.startsWith(`${state.session.code}/${m.id}/`)).forEach((r) => {
+        // 교사 목록용 작은 미리보기(_t.jpg)는 같은 사진이므로 빼고, 찍은 순서대로 보여 준다
+        rows.filter((r) => r.key.startsWith(`${state.session.code}/${m.id}/`) && !r.key.endsWith("_t.jpg"))
+          .sort((a, b) => a.key.localeCompare(b.key)).forEach((r) => {
           const url = URL.createObjectURL(r.blob);
           prevGrid.append(el("div", { class: "ph" }, el("img", { src: url })));
         });
