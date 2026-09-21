@@ -32,6 +32,7 @@ const state = {
   stampsUnavailable: false,
   onlyUnstamped: false,
   urls: {},
+  urlAt: {}, // 사진 임시 주소를 받은 시각
   loadedAt: null,
   error: null,
 };
@@ -92,10 +93,20 @@ async function load() {
   state.error = null;
   state.loadedAt = new Date();
   await backfillAutoStamps();
-  const paths = [];
-  for (const s of state.submissions) for (const p of s.photo_paths || []) if (!state.urls[p]) paths.push(p);
-  if (paths.length) Object.assign(state.urls, await backend.signedUrls(paths));
+  await refreshPhotoUrls();
   render();
+}
+// 사진 임시 주소는 15분만 유효하다. 받은 지 10분이 지났거나 아직 없는 사진만 새로 받는다.
+const URL_TTL_MS = 10 * 60 * 1000;
+async function refreshPhotoUrls() {
+  const now = Date.now();
+  const paths = [];
+  for (const s of state.submissions) for (const p of s.photo_paths || []) {
+    if (!state.urls[p] || !state.urlAt[p] || now - state.urlAt[p] > URL_TTL_MS) paths.push(p);
+  }
+  if (!paths.length) return;
+  const fresh = await backend.signedUrls(paths);
+  for (const [p, u] of Object.entries(fresh)) { state.urls[p] = u; state.urlAt[p] = now; }
 }
 // 도장 도우미
 function stampKey(code, mid) { return `${code}:${mid}`; }
@@ -424,7 +435,7 @@ function viewTools() {
       if (typed !== "삭제") return;
       const r = await backend.deleteAll();
       if (!r.ok) alert(`삭제 실패: ${r.message || ""}`);
-      else { alert("모두 삭제했습니다."); state.urls = {}; load(); }
+      else { alert("모두 삭제했습니다."); state.urls = {}; state.urlAt = {}; load(); }
     } }, "학생 데이터 전체 삭제"),
   ]));
   wrap.append(el("div", { class: "card" }, [
