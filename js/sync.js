@@ -27,26 +27,38 @@ export function thumbPath(path) {
   return path.replace(/\.jpg$/, "_t.jpg");
 }
 
-// 새 제출을 대기열에 넣는다. photos: Blob[], thumbs: Blob[] (photos와 같은 순서의 작은 미리보기, 선택)
+// 새 제출을 대기열에 넣는다.
+// photos: 각 항목은 Blob(새 사진) 또는 { blob, thumb, path, uploaded }.
+//   path 가 있으면 이전 제출에서 유지하는 사진: 파일은 이미 폰에 있고, uploaded=true 면 서버에도 있어 다시 올리지 않는다.
 export async function enqueue({ code, placeId, missionId, answer, photos, thumbs }) {
   const id = uuid();
+  const entries = (photos || []).map((x, i) => (x instanceof Blob ? { blob: x, thumb: thumbs && thumbs[i] } : x));
+  const keptPaths = new Set(entries.filter((e) => e.path).flatMap((e) => [e.path, thumbPath(e.path)]));
   // 같은 미션의 이전 대기 항목은 새 제출로 대체된다
   const existing = (await store.all("outbox")).filter((i) => i.code === code && i.missionId === missionId);
   for (const old of existing) await store.del("outbox", old.id);
-  // 이전 사진도 정리
-  const oldPhotos = (await store.all("photos")).filter((p) => p.key.startsWith(`${code}/${missionId}/`));
+  // 이전 사진 중 유지하지 않는 것은 정리
+  const oldPhotos = (await store.all("photos")).filter((p) => p.key.startsWith(`${code}/${missionId}/`) && !keptPaths.has(p.key));
   for (const p of oldPhotos) await store.del("photos", p.key);
 
   const photoPaths = [];
-  for (let i = 0; i < (photos || []).length; i++) {
+  const uploaded = [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (e.path) {
+      photoPaths.push(e.path);
+      uploaded.push(!!e.uploaded);
+      continue;
+    }
     const path = photoPath(code, missionId, id, i);
-    await store.put("photos", { key: path, blob: photos[i], code, missionId, createdAt: Date.now() });
-    if (thumbs && thumbs[i]) await store.put("photos", { key: thumbPath(path), blob: thumbs[i], code, missionId, createdAt: Date.now() });
+    await store.put("photos", { key: path, blob: e.blob, code, missionId, createdAt: Date.now() });
+    if (e.thumb) await store.put("photos", { key: thumbPath(path), blob: e.thumb, code, missionId, createdAt: Date.now() });
     photoPaths.push(path);
+    uploaded.push(false);
   }
   const item = {
     id, code, placeId, missionId, answer, photoPaths,
-    uploaded: photoPaths.map(() => false),
+    uploaded,
     attempts: 0, nextAt: 0, createdAt: Date.now(), lastError: null,
   };
   await store.put("outbox", item);

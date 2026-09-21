@@ -47,7 +47,7 @@ async function loadDrafts() {
   try {
     for (const d of await store.all("drafts")) {
       if (d.code !== state.session.code) continue;
-      state.draft[draftKeyOf(d.placeId, d.missionId)] = { choice: d.choice ?? null, text: d.text || "", photos: d.photos || [] };
+      state.draft[draftKeyOf(d.placeId, d.missionId)] = { choice: d.choice ?? null, text: d.text || "", photos: d.photos || [], keptPaths: d.keptPaths };
     }
   } catch (e) { console.error(e); }
 }
@@ -57,7 +57,7 @@ function saveDraft(placeId, missionId) {
   draftTimer = setTimeout(() => {
     const d = state.draft[draftKeyOf(placeId, missionId)];
     if (!d || !state.session) return;
-    store.put("drafts", { key: `${state.session.code}:${missionId}`, code: state.session.code, placeId, missionId, choice: d.choice, text: d.text, photos: d.photos, at: Date.now() }).catch(() => {});
+    store.put("drafts", { key: `${state.session.code}:${missionId}`, code: state.session.code, placeId, missionId, choice: d.choice, text: d.text, photos: d.photos, keptPaths: d.keptPaths, at: Date.now() }).catch(() => {});
   }, 250);
 }
 function clearDraft(placeId, missionId) {
@@ -674,6 +674,7 @@ function viewMission(placeId, missionId) {
     body.append(el("div", { class: "field" }, [m.type === "photo" ? el("label", {}, m.caption) : null, textarea]));
   }
   let photoGrid = null;
+  let photoState = null; // 사진 미션의 이전 사진 유지 상태
   if (m.type === "photo") {
     const max = m.maxPhotos || 1;
     photoGrid = el("div", { class: "photos" });
@@ -684,7 +685,7 @@ function viewMission(placeId, missionId) {
       const files = Array.from(input.files || []);
       input.value = "";
       if (!files.length) return;
-      const room = max - draft.photos.length;
+      const room = photoState ? photoState.roomLeft() : max - draft.photos.length;
       if (room <= 0) return;
       if (files.length > room) toast(`사진은 최대 ${max}장까지예요. 앞의 ${room}장만 넣었어요.`, "warn", 3000);
       for (const f of files.slice(0, room)) {
@@ -704,37 +705,62 @@ function viewMission(placeId, missionId) {
     fileInput.addEventListener("change", onPick(fileInput));
     galleryInput.addEventListener("change", onPick(galleryInput));
     body.append(fileInput, galleryInput);
+    // 이전에 제출한 사진: 이 폰에 남아 있는 파일을 같은 격자에 보여 주고, ✕로 빼거나 새 사진을 더할 수 있다
+    const kept = []; // { path, blob }
+    let keptLoaded = false;
+    let keptMissing = 0; // 다른 폰에서 제출해 이 폰에 없는 이전 사진 수
+    const total = () => kept.length + draft.photos.length;
+    const loadKept = async () => {
+      try {
+        const rows = (await store.all("photos"))
+          .filter((r) => r.key.startsWith(`${state.session.code}/${m.id}/`) && !r.key.endsWith("_t.jpg") && r.blob)
+          .sort((a, b) => a.key.localeCompare(b.key));
+        // 초안에 '남길 사진' 목록이 있으면(이전에 ✕로 뺀 것 반영) 그것만, 없으면 전부
+        const want = Array.isArray(draft.keptPaths) ? new Set(draft.keptPaths) : null;
+        for (const r of rows) if (!want || want.has(r.key)) kept.push({ path: r.key, blob: r.blob });
+        if (prev && prev.photoCount && !rows.length) keptMissing = prev.photoCount;
+      } catch (e) { /* 저장소를 못 읽으면 새 사진만 */ }
+      keptLoaded = true;
+      renderPhotos();
+    };
     const renderPhotos = () => {
       photoGrid.innerHTML = "";
+      kept.forEach((k, i) => {
+        const url = URL.createObjectURL(k.blob);
+        const img = el("img", { src: url, alt: `이전 사진 ${i + 1}` });
+        img.onload = () => URL.revokeObjectURL(url);
+        photoGrid.append(el("div", { class: "ph kept" }, [
+          img,
+          el("span", { class: "tag" }, prev && prev.status === "sent" ? "제출됨" : "저장됨"),
+          el("button", { class: "rm", "aria-label": "이 사진 빼기", onclick: () => { kept.splice(i, 1); draft.keptPaths = kept.map((x) => x.path); saveDraft(placeId, missionId); renderPhotos(); } }, "✕"),
+        ]));
+      });
       draft.photos.forEach((blob, i) => {
         const url = URL.createObjectURL(blob);
-        const img = el("img", { src: url, alt: `사진 ${i + 1}` });
+        const img = el("img", { src: url, alt: `사진 ${kept.length + i + 1}` });
         img.onload = () => URL.revokeObjectURL(url);
         photoGrid.append(el("div", { class: "ph" }, [img, el("button", { class: "rm", "aria-label": "삭제", onclick: () => { draft.photos.splice(i, 1); saveDraft(placeId, missionId); renderPhotos(); } }, "✕")]));
       });
-      if (draft.photos.length < max) {
-        photoGrid.append(el("button", { class: "add", onclick: () => fileInput.click() }, [el("span", {}, "📷"), draft.photos.length ? "추가" : "사진 찍기"]));
+      if (total() < max) {
+        photoGrid.append(el("button", { class: "add", onclick: () => fileInput.click() }, [el("span", {}, "📷"), total() ? "추가" : "사진 찍기"]));
       }
     };
+    // onPick 의 남은 칸 계산이 이전 사진까지 포함하도록
+    const roomLeft = () => max - total();
     renderPhotos();
+    const keptNote = el("p", { class: "muted small", style: "margin:6px 0 0" });
     body.append(el("div", { class: "field" }, [
       el("label", {}, `사진 (최대 ${max}장)`),
       photoGrid,
-      el("p", { class: "photo-alt" }, el("a", { href: "#", onclick: (e) => { e.preventDefault(); if (draft.photos.length < max) galleryInput.click(); } }, "이미 찍은 사진을 앨범에서 고르기")),
+      keptNote,
+      el("p", { class: "photo-alt" }, el("a", { href: "#", onclick: (e) => { e.preventDefault(); if (total() < max) galleryInput.click(); } }, "이미 찍은 사진을 앨범에서 고르기")),
     ]));
-    // 이미 제출한 사진 미리보기
-    if (prev && prev.photoCount) {
-      const prevGrid = el("div", { class: "photos" });
-      store.all("photos").then((rows) => {
-        // 교사 목록용 작은 미리보기(_t.jpg)는 같은 사진이므로 빼고, 찍은 순서대로 보여 준다
-        rows.filter((r) => r.key.startsWith(`${state.session.code}/${m.id}/`) && !r.key.endsWith("_t.jpg"))
-          .sort((a, b) => a.key.localeCompare(b.key)).forEach((r) => {
-          const url = URL.createObjectURL(r.blob);
-          prevGrid.append(el("div", { class: "ph" }, el("img", { src: url })));
-        });
-        if (prevGrid.children.length) body.append(el("div", { class: "field" }, [el("label", { class: "muted" }, "이전에 제출한 사진"), prevGrid]));
-      });
-    }
+    loadKept().then(() => {
+      if (kept.length) keptNote.textContent = "이전에 낸 사진은 그대로 남아요. ✕를 누르면 빼고, 빈 칸에 새 사진을 더할 수 있어요.";
+      else if (keptMissing) keptNote.textContent = `이전에 낸 사진 ${keptMissing}장은 다른 폰에서 제출해 여기에는 없어요. 다시 제출하면 새 사진으로 바뀌어요.`;
+      else keptNote.remove();
+    });
+    photoState = { kept: () => kept, total, roomLeft, ready: () => keptLoaded };
   }
   card.append(body, err);
 
@@ -749,7 +775,7 @@ function viewMission(placeId, missionId) {
       if (!draft.text.trim()) return showErr("답을 적어 주세요.");
       answer = { text: draft.text.trim() };
     } else {
-      if (!draft.photos.length) return showErr("사진을 한 장 이상 찍어 주세요.");
+      if (!(photoState ? photoState.total() : draft.photos.length)) return showErr("사진을 한 장 이상 찍어 주세요.");
       if (m.caption && !draft.text.trim()) return showErr("사진 설명을 적어 주세요.");
       answer = { text: draft.text.trim() };
     }
@@ -758,8 +784,12 @@ function viewMission(placeId, missionId) {
       // 교사 화면 목록용 작은 미리보기(약 30KB)를 함께 만든다. 실패해도 제출은 진행한다.
       let thumbs = [];
       try { thumbs = await Promise.all(draft.photos.map((b) => compressImage(b, { maxSide: 360, quality: 0.7, maxBytes: 40 * 1024 }))); } catch (e) { thumbs = []; }
-      await enqueue({ code: state.session.code, placeId, missionId: m.id, answer, photos: draft.photos, thumbs });
-      state.progress[m.id] = { status: "queued", answer, photoCount: draft.photos.length, at: new Date().toISOString() };
+      // 이전 제출에서 남긴 사진은 경로를 그대로 쓰고(서버에 이미 있으면 다시 올리지 않음), 새 사진만 새로 올린다
+      const keptEntries = photoState ? photoState.kept().map((k) => ({ blob: k.blob, path: k.path, uploaded: !!(prev && prev.status === "sent") })) : [];
+      const newEntries = draft.photos.map((b, i) => ({ blob: b, thumb: thumbs[i] }));
+      const photos = [...keptEntries, ...newEntries];
+      await enqueue({ code: state.session.code, placeId, missionId: m.id, answer, photos });
+      state.progress[m.id] = { status: "queued", answer, photoCount: photos.length, at: new Date().toISOString() };
       saveProgress();
       clearDraft(placeId, missionId);
       toast(navigator.onLine ? "제출했어요! 전송 중…" : "저장했어요! 인터넷이 연결되면 자동으로 보내요.", "ok");
