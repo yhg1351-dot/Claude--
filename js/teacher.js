@@ -382,7 +382,19 @@ function viewByGroup() {
   const wrap = el("div");
   const sel = el("select", { onchange: (e) => { state.groupSel = e.target.value; render(); } }, codes.map((c) => el("option", { value: c, selected: state.groupSel === c ? "" : null }, `${codeLabel(c)} (${subsFor(c).length}건)`)));
   if (!state.groupSel || !codes.includes(state.groupSel)) state.groupSel = codes[0];
-  wrap.append(el("div", { class: "toolbar" }, [el("label", { class: "muted small" }, "모둠: "), sel, unstampedFilter()]));
+  const resetBtn = el("button", { class: "btn small ghost danger", style: "margin-left:auto", onclick: async () => {
+    const code = state.groupSel;
+    const n = subsFor(code).length;
+    const typed = prompt(`${codeLabel(code)}의 제출 ${n}건, 사진, 도장, 접속 정보를 모두 지웁니다. 다른 모둠은 그대로입니다. 되돌릴 수 없습니다.\n계속하려면 모둠 코드 ${code} 를 입력하세요.`);
+    if (typed === null) return;
+    if (typed.trim() !== code) { alert("모둠 코드가 일치하지 않아 취소했습니다."); return; }
+    const r = await backend.resetGroup(code);
+    if (!r.ok) { alert(`초기화 실패: ${r.message || ""}`); return; }
+    for (const p of Object.keys(state.urls)) if (p.startsWith(`${code}/`)) { delete state.urls[p]; delete state.urlAt[p]; delete state.urlMissing[p]; }
+    alert(`${codeLabel(code)}을 초기화했습니다. (사진 ${r.photos || 0}장 삭제)`);
+    load();
+  } }, "이 모둠 초기화");
+  wrap.append(el("div", { class: "toolbar" }, [el("label", { class: "muted small" }, "모둠: "), sel, unstampedFilter(), resetBtn]));
   for (const [pid, p] of missionPlaces()) {
     const card = el("div", { class: "card" });
     card.append(el("h2", {}, [p.emoji ? `${p.emoji} ` : "", p.name]));

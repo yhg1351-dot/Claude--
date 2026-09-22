@@ -197,25 +197,46 @@ function makeSupabase() {
         .eq("code", code);
       return error ? { ok: false, message: error.message } : { ok: true };
     },
+    // 저장소의 한 폴더(비우면 전체) 아래 사진을 깊이에 상관없이 모두 지운다
+    async removePhotosUnder(prefix) {
+      const bucket = client.storage.from("photos");
+      const paths = [];
+      const walk = async (pre) => {
+        const r = await bucket.list(pre, { limit: 1000 });
+        if (r.error) throw new Error(r.error.message);
+        for (const f of r.data || []) {
+          const full = pre ? `${pre}/${f.name}` : f.name;
+          if (f.id) paths.push(full); // 파일 (폴더는 id가 null)
+          else await walk(full);
+        }
+      };
+      await walk(prefix || "");
+      for (let i = 0; i < paths.length; i += 100) {
+        const r = await bucket.remove(paths.slice(i, i + 100));
+        if (r.error) throw new Error(r.error.message);
+      }
+      return paths.length;
+    },
+    // 한 모둠만 초기화: 그 모둠의 사진·제출·도장·접속 정보. 다른 모둠은 건드리지 않는다.
+    async resetGroup(code) {
+      if (!/^[0-9]{4,5}$/.test(code)) return { ok: false, message: "모둠 코드가 올바르지 않습니다." };
+      try {
+        const photos = await this.removePhotosUnder(code);
+        const a = await client.from("stamps").delete().eq("group_code", code);
+        if (a.error && !/relation .* does not exist/i.test(a.error.message)) return { ok: false, message: a.error.message };
+        const b = await client.from("submissions").delete().eq("group_code", code);
+        if (b.error) return { ok: false, message: b.error.message };
+        const c = await client.from("group_sessions").delete().eq("code", code);
+        if (c.error) return { ok: false, message: c.error.message };
+        return { ok: true, photos };
+      } catch (e) {
+        return netErr(e);
+      }
+    },
     async deleteAll() {
       try {
         // 1) 저장소의 모든 사진 삭제 (모둠 폴더 → 미션 폴더 → 파일, 깊이에 상관없이 모두)
-        const bucket = client.storage.from("photos");
-        const paths = [];
-        const walk = async (prefix) => {
-          const r = await bucket.list(prefix, { limit: 1000 });
-          if (r.error) throw new Error(r.error.message);
-          for (const f of r.data || []) {
-            const full = prefix ? `${prefix}/${f.name}` : f.name;
-            if (f.id) paths.push(full); // 파일 (폴더는 id가 null)
-            else await walk(full);
-          }
-        };
-        await walk("");
-        for (let i = 0; i < paths.length; i += 100) {
-          const r = await bucket.remove(paths.slice(i, i + 100));
-          if (r.error) return { ok: false, message: r.error.message };
-        }
+        await this.removePhotosUnder("");
         // 2) 제출 내용과 접속 정보 삭제
         const r = await client.rpc("teacher_delete_all");
         if (r.error) return { ok: false, message: r.error.message };
@@ -387,6 +408,14 @@ function makeLocal() {
     async groupState(code) {
       const s = sessions()[code];
       return { ok: true, exists: !!s, released: !!s && s.device_id === "" };
+    },
+    async resetGroup(code) {
+      for (const r of await store.all("localSubmissions")) if (r.group_code === code) await store.del("localSubmissions", r.key);
+      let photos = 0;
+      for (const r of await store.all("photos")) if (r.key.startsWith(`${code}/`)) { await store.del("photos", r.key); photos += 1; }
+      const all = sessions(); delete all[code]; save(all);
+      const st = stampsAll(); for (const k of Object.keys(st)) if (k.startsWith(`${code}:`)) delete st[k]; ls.set(STAMP_KEY, st);
+      return { ok: true, photos };
     },
     async deleteAll() {
       await store.clear("localSubmissions");
