@@ -34,12 +34,10 @@ export async function enqueue({ code, placeId, missionId, answer, photos, thumbs
   const id = uuid();
   const entries = (photos || []).map((x, i) => (x instanceof Blob ? { blob: x, thumb: thumbs && thumbs[i] } : x));
   const keptPaths = new Set(entries.filter((e) => e.path).flatMap((e) => [e.path, thumbPath(e.path)]));
-  // 같은 미션의 이전 대기 항목은 새 제출로 대체된다
+  // 같은 미션의 이전 대기 항목(있으면)은 새 제출로 대체된다. 이미 올라간 사진 표시는 이어받는다.
   const existing = (await store.all("outbox")).filter((i) => i.code === code && i.missionId === missionId);
-  for (const old of existing) await store.del("outbox", old.id);
-  // 이전 사진 중 유지하지 않는 것은 정리
-  const oldPhotos = (await store.all("photos")).filter((p) => p.key.startsWith(`${code}/${missionId}/`) && !keptPaths.has(p.key));
-  for (const p of oldPhotos) await store.del("photos", p.key);
+  const alreadyUp = new Set();
+  for (const old of existing) (old.photoPaths || []).forEach((pth, i) => { if (old.uploaded && old.uploaded[i]) alreadyUp.add(pth); });
 
   const photoPaths = [];
   const uploaded = [];
@@ -47,7 +45,7 @@ export async function enqueue({ code, placeId, missionId, answer, photos, thumbs
     const e = entries[i];
     if (e.path) {
       photoPaths.push(e.path);
-      uploaded.push(!!e.uploaded);
+      uploaded.push(!!e.uploaded || alreadyUp.has(e.path));
       continue;
     }
     const path = photoPath(code, missionId, id, i);
@@ -61,7 +59,12 @@ export async function enqueue({ code, placeId, missionId, answer, photos, thumbs
     uploaded,
     attempts: 0, nextAt: 0, createdAt: Date.now(), lastError: null,
   };
-  await store.put("outbox", item);
+  await store.put("outbox", item); // 새 항목을 먼저 저장하고 나서 이전 것을 지운다 (저장이 실패해도 이전 제출이 사라지지 않게)
+  for (const old of existing) if (old.id !== item.id) await store.del("outbox", old.id);
+  // 이전 사진 중 유지하지 않는 것은 정리
+  const newPaths = new Set(photoPaths.flatMap((pth) => [pth, thumbPath(pth)]));
+  const oldPhotos = (await store.all("photos")).filter((ph) => ph.key.startsWith(`${code}/${missionId}/`) && !keptPaths.has(ph.key) && !newPaths.has(ph.key));
+  for (const ph of oldPhotos) await store.del("photos", ph.key);
   emit({ type: "queued", missionId });
   blockedByToken = false;
   kick();
@@ -122,8 +125,12 @@ async function sendItem(item, token) {
     if (item.uploaded[i]) continue;
     const row = await store.get("photos", item.photoPaths[i]);
     if (!row || !row.blob) {
-      // 사진이 사라졌으면(저장소 정리 등) 그 사진은 제외하고 계속 진행
-      item.uploaded[i] = true;
+      // 사진이 사라졌으면(저장소 정리 등) 그 경로를 제출에서 빼고 계속 진행 (교사 화면에 깨진 사진이 남지 않게)
+      item.photoPaths.splice(i, 1);
+      item.uploaded.splice(i, 1);
+      i -= 1;
+      if (!(await stillQueued(item))) return { ok: false, reason: "stale" };
+      await store.put("outbox", item);
       continue;
     }
     emit({ type: "uploading", missionId: item.missionId, index: i, total: item.photoPaths.length });

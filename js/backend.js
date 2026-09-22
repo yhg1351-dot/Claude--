@@ -382,4 +382,7 @@ function makeLocal() {
   };
 }
 
+// 서버가 설정되어 있는데 연결 라이브러리(vendor/supabase.js)를 못 받은 경우: 데모 모드로 조용히 넘어가면
+// 제출이 폰에만 저장되면서 '전송 완료'로 보이므로, 앱이 이를 알고 진행을 막게 한다.
+export const backendUnavailable = !!(isConfigured && !window.supabase);
 export const backend = isConfigured && window.supabase ? makeSupabase() : makeLocal();

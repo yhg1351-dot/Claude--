@@ -1,6 +1,6 @@
 // 학생용 앱 화면. 해시 주소(#/place/…, #/mission/…)로 화면을 바꾸어 뒤로가기 버튼이 동작한다.
 import { store, ls, uuid } from "./store.js";
-import { backend, isConfigured } from "./backend.js";
+import { backend, isConfigured, backendUnavailable } from "./backend.js";
 import { compressImage } from "./image.js";
 import { enqueue, pending, onSync, startSyncLoop, resumeAfterLogin, kick, retryNow, purgeStale } from "./sync.js";
 import { loadTripData } from "./data.js";
@@ -684,6 +684,8 @@ function viewMission(placeId, missionId) {
   const prev = state.progress[m.id];
   const draftKey = draftKeyOf(placeId, missionId);
   const draft = state.draft[draftKey] || (state.draft[draftKey] = { choice: prev?.answer?.choice ?? null, text: prev?.answer?.text || "", photos: [] });
+  // 교사가 보기를 줄인 뒤라면 예전 선택 번호가 범위를 벗어날 수 있다 → 선택 없음으로
+  if (m.type === "choice" && draft.choice !== null && draft.choice !== undefined && !(Number.isInteger(draft.choice) && draft.choice >= 0 && draft.choice < (m.options || []).length)) draft.choice = null;
 
   const wrap = el("div");
   wrap.append(el("div", { class: "topbar" }, [
@@ -740,7 +742,7 @@ function viewMission(placeId, missionId) {
       input.value = "";
       if (!files.length) return;
       const room = photoState ? photoState.roomLeft() : max - draft.photos.length;
-      if (room <= 0) return;
+      if (room <= 0) { toast(`사진은 최대 ${max}장까지예요. 먼저 한 장을 ✕로 빼 주세요.`, "warn", 3000); return; }
       if (files.length > room) toast(`사진은 최대 ${max}장까지예요. 앞의 ${room}장만 넣었어요.`, "warn", 3000);
       for (const f of files.slice(0, room)) {
         const busy = el("div", { class: "ph" }, el("div", { style: "display:grid;place-items:center;height:100%" }, el("span", { class: "spinner" })));
@@ -753,6 +755,8 @@ function viewMission(placeId, missionId) {
           console.error(e);
           toast("사진을 읽지 못했어요. 다른 사진으로 다시 시도해 주세요.", "error");
         }
+        // 압축하는 사이 화면이 다시 그려졌으면(설치 안내·설정 갱신 등) 이 격자는 떨어져 나간 것 → 현재 화면을 다시 그린다
+        if (!photoGrid.isConnected) { render(); return; }
         renderPhotos();
       }
     };
@@ -823,13 +827,14 @@ function viewMission(placeId, missionId) {
     err.classList.add("hidden");
     let answer;
     if (m.type === "choice") {
-      if (draft.choice === null || draft.choice === undefined) return showErr("답을 하나 골라 주세요.");
+      if (draft.choice === null || draft.choice === undefined || !(draft.choice >= 0 && draft.choice < (m.options || []).length)) return showErr("답을 하나 골라 주세요.");
       answer = { choice: draft.choice, text: m.options[draft.choice] };
     } else if (m.type === "text") {
       if (!draft.text.trim()) return showErr("답을 적어 주세요.");
       answer = { text: draft.text.trim() };
     } else {
       if (!(photoState ? photoState.total() : draft.photos.length)) return showErr("사진을 한 장 이상 찍어 주세요.");
+      if ((photoState ? photoState.total() : draft.photos.length) > (m.maxPhotos || 1)) return showErr(`사진은 최대 ${m.maxPhotos || 1}장까지예요. ✕로 몇 장 빼 주세요.`);
       if (m.caption && !draft.text.trim()) return showErr("사진 설명을 적어 주세요.");
       answer = { text: draft.text.trim() };
     }
@@ -902,6 +907,20 @@ async function refreshPending() {
 
 // ------------------------------------------------------------ 시작
 async function init() {
+  if (backendUnavailable) {
+    // 서버 연결 파일을 못 받았다. 데모 모드로 열면 제출이 폰에만 저장되므로 여기서 멈춘다.
+    booted = true;
+    root().innerHTML = "";
+    root().append(el("div", { class: "card", style: "margin-top:24px" }, [
+      el("h2", {}, "앱 파일을 다 받지 못했어요"),
+      el("p", { class: "muted" }, "신호가 약해 서버 연결 파일이 빠졌어요. 이대로 쓰면 제출이 서버에 가지 않으니, 신호가 잡히는 곳에서 다시 열어 주세요."),
+      el("div", { class: "row", style: "margin-top:12px" }, [
+        el("button", { class: "btn primary", onclick: () => location.reload() }, "다시 열기"),
+        el("button", { class: "btn", onclick: resetApp }, "처음부터 다시 열기"),
+      ]),
+    ]));
+    return;
+  }
   // 8초가 지나도 첫 화면이 안 열리면 안내와 초기화 버튼을 보여 준다
   const slow = setTimeout(() => {
     if (booted) return;

@@ -1,6 +1,6 @@
 // 서비스 워커: 앱 파일을 폰에 캐시해 신호가 약해도 화면이 열리게 한다.
 // 네트워크 우선(최신 파일), 실패하면 캐시 사용. Supabase 요청은 건드리지 않는다.
-const VERSION = "mq-v29";
+const VERSION = "mq-v30";
 const PRECACHE = [
   "./",
   "./index.html",
@@ -25,9 +25,14 @@ const PRECACHE = [
   "./icons/icon-192.png",
 ];
 
+// 이 파일들은 하나라도 못 받으면 새 버전을 설치하지 않는다 (이전 캐시를 그대로 두어 오프라인에서 앱이 계속 열리게)
+const CORE = PRECACHE.filter((u) => u === "./" || u.endsWith(".html") || u.endsWith(".css") || u.endsWith(".js") || u.endsWith(".json"));
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(VERSION).then((cache) => Promise.allSettled(PRECACHE.map((u) => cache.add(u)))).then(() => self.skipWaiting())
+    caches.open(VERSION).then(async (cache) => {
+      await Promise.all(CORE.map((u) => cache.add(u)));
+      await Promise.allSettled(PRECACHE.filter((u) => !CORE.includes(u)).map((u) => cache.add(u)));
+    }).then(() => self.skipWaiting())
   );
 });
 
