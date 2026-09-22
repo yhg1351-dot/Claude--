@@ -4,7 +4,7 @@
   "short_name": "경주 미션 교사",
   "description": "6학년 경주 수학여행 교사 확인·편집 화면",
   "start_url": "./teacher.html",
-  "scope": "./",
+  "scope": "./teacher.html",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f6f4ef",

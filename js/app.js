@@ -322,7 +322,7 @@ async function resetApp() {
   try { Object.keys(localStorage).filter((k) => k.startsWith("mq-") && k !== "mq-device-id").forEach((k) => localStorage.removeItem(k)); } catch (e) {}
   try { if (window.caches) for (const k of await caches.keys()) await caches.delete(k); } catch (e) {}
   try { if (navigator.serviceWorker) for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); } catch (e) {}
-  location.replace(location.pathname);
+  location.replace("./index.html"); // 설치된 앱의 범위(index.html) 안에 머물도록
 }
 // 화면이 비어 있는 채로 스크립트 오류가 나면 복구 카드를 띄운다
 let booted = false;

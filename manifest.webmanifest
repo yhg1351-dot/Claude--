@@ -4,7 +4,7 @@
   "short_name": "경주 미션",
   "description": "6학년 경주 수학여행 일정·미션·퀴즈 앱",
   "start_url": "./index.html",
-  "scope": "./",
+  "scope": "./index.html",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f6f4ef",
