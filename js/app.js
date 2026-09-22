@@ -280,9 +280,13 @@ setupPwa({
 // ------------------------------------------------------------ 렌더링
 const root = () => $("#app");
 
+// 화면별 스크롤 위치: 미션에서 돌아왔을 때 보던 자리로, 같은 화면을 다시 그릴 때도 제자리에
+const scrollMemo = {};
+let lastHash = location.hash;
 function render() {
   rememberRoute();
   const app = root();
+  scrollMemo[lastHash] = window.scrollY;
   if (state.certPending && route().name !== "mission" && route().name !== "login") { maybeShowCertificate(); }
   try {
     const r = route();
@@ -300,7 +304,12 @@ function render() {
     return;
   }
   renderStatus();
-  window.scrollTo(0, 0);
+  const h = location.hash, r = route();
+  // 홈·장소 화면은 기억한 위치로, 같은 화면을 다시 그린 경우도 제자리로, 새로 여는 미션·인증서는 맨 위로
+  const y = (r.name === "home" || r.name === "place" || h === lastHash) ? (scrollMemo[h] || 0) : 0;
+  lastHash = h;
+  window.scrollTo(0, y);
+  if (y) requestAnimationFrame(() => window.scrollTo(0, y)); // 이미지 등으로 높이가 늦게 잡히는 경우 한 번 더
 }
 
 // ------------------------------------------------------------ 오류 복구
