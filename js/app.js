@@ -166,6 +166,12 @@ async function recoverSession() {
   if (!isRep()) return false;
   if (recovering) return recovering;
   recovering = (async () => {
+    // 선생님이 '해제'한 경우에는 자동으로 다시 대표가 되지 않는다 (학생이 버튼으로 다시 정할 수는 있음)
+    const st = await backend.groupState(state.session.code);
+    if (st && st.ok && st.exists && st.released) {
+      dropRep("선생님이 우리 모둠 대표 폰을 해제했어요. 다시 대표가 되려면 '대표 폰으로 정하기'를 누르세요.");
+      return false;
+    }
     const r = await backend.claimGroup(state.session.code, state.session.deviceId || deviceId());
     if (r.ok) {
       state.session = { ...state.session, token: r.token, at: Date.now() };

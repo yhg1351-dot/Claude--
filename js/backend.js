@@ -41,6 +41,8 @@ function makeSupabase() {
     client,
     claimGroup: (code, deviceId) => rpc("claim_group", { p_code: code, p_device_id: deviceId }),
     heartbeat: (token) => rpc("heartbeat", { p_token: token }),
+    // 모둠 상태: 해제됨/지워짐 구분. 서버 함수가 아직 없으면(업데이트 SQL 미실행) ok:false
+    groupState: (code) => rpc("group_state", { p_code: code }),
     getProgress: (token) => rpc("get_progress", { p_token: token }),
     getGroupProgress: (code) => rpc("get_group_progress", { p_code: code }),
     async uploadPhoto(code, path, blob) {
@@ -76,6 +78,12 @@ function makeSupabase() {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 10000);
       try {
+        if (!isTeacher) {
+          // 학생 앱: 정답을 뺀 설정을 주는 서버 함수. (업데이트 SQL 을 아직 안 돌렸으면 표에서 직접 읽는다)
+          const { data: r, error: e1 } = await client.rpc("get_trip_config").abortSignal(ctrl.signal);
+          if (!e1 && r && typeof r === "object") return { ok: true, data: r.data || null, updatedAt: r.updated_at || null };
+          if (e1 && !/function|schema cache|PGRST202|42883/i.test(e1.message || "")) return { ok: false, reason: "network", message: e1.message };
+        }
         const { data, error } = await client.from("app_config").select("data, updated_at").eq("id", "trip").abortSignal(ctrl.signal).maybeSingle();
         if (error) return { ok: false, reason: "network", message: error.message };
         if (!data) return { ok: true, data: null, updatedAt: null };
@@ -179,6 +187,10 @@ function makeSupabase() {
       }
     },
     async releaseGroup(code) {
+      // 서버 함수가 토큰을 새로 발급해 옛 대표 폰을 끊는다. 함수가 아직 없으면(업데이트 SQL 미실행) 예전 방식으로.
+      const r = await rpc("release_group", { p_code: code });
+      if (r.ok) return r;
+      if (!/function|schema cache|PGRST202|42883/i.test(r.message || "")) return r;
       const { error } = await client
         .from("group_sessions")
         .update({ last_seen: new Date(Date.now() - 24 * 3600 * 1000).toISOString() })
@@ -368,9 +380,13 @@ function makeLocal() {
     },
     async releaseGroup(code) {
       const all = sessions();
-      if (all[code]) all[code].last_seen = Date.now() - 24 * 3600 * 1000;
+      if (all[code]) { all[code].last_seen = Date.now() - 24 * 3600 * 1000; all[code].token = uuid(); all[code].prev_token = null; all[code].device_id = ""; }
       save(all);
       return { ok: true };
+    },
+    async groupState(code) {
+      const s = sessions()[code];
+      return { ok: true, exists: !!s, released: !!s && s.device_id === "" };
     },
     async deleteAll() {
       await store.clear("localSubmissions");
