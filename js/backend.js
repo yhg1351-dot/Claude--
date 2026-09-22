@@ -148,15 +148,20 @@ function makeSupabase() {
       }
     },
     async signedUrls(paths) {
-      if (!paths.length) return {};
-      const out = {};
+      return (await this.signedUrlsDetailed(paths)).urls;
+    },
+    // urls: 경로→임시 주소, missing: 서버에 파일이 없는 경로(요청은 성공). 요청 자체가 실패한 경로는 둘 다에 없다.
+    async signedUrlsDetailed(paths) {
+      const urls = {}, missing = [];
       for (let i = 0; i < paths.length; i += 100) {
         const chunk = paths.slice(i, i + 100);
-        const { data, error } = await client.storage.from("photos").createSignedUrls(chunk, 60 * 15);
-        if (error) continue;
-        for (const d of data) if (d.signedUrl) out[d.path] = d.signedUrl;
+        try {
+          const { data, error } = await client.storage.from("photos").createSignedUrls(chunk, 60 * 15);
+          if (error || !Array.isArray(data)) continue;
+          for (const d of data) { if (d.signedUrl) urls[d.path] = d.signedUrl; else if (d.path) missing.push(d.path); }
+        } catch (e) { /* 네트워크 실패: 다음 갱신 때 다시 */ }
       }
-      return out;
+      return { urls, missing };
     },
     // 도장 찍기/지우기 (교사)
     async setStamp(code, missionId, on, opts = {}) {
@@ -351,12 +356,15 @@ function makeLocal() {
       return { ok: true };
     },
     async signedUrls(paths) {
-      const out = {};
+      return (await this.signedUrlsDetailed(paths)).urls;
+    },
+    async signedUrlsDetailed(paths) {
+      const urls = {}, missing = [];
       for (const p of paths) {
         const row = await store.get("photos", p);
-        if (row && row.blob) out[p] = URL.createObjectURL(row.blob);
+        if (row && row.blob) urls[p] = URL.createObjectURL(row.blob); else missing.push(p);
       }
-      return out;
+      return { urls, missing };
     },
     async releaseGroup(code) {
       const all = sessions();

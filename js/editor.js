@@ -100,7 +100,7 @@ export function createEditor(container, ctx) {
     card.append(el("h2", {}, "기본 정보"));
     card.append(el("div", { class: "ed-row two" }, [
       field("여행 이름", t.title, (v) => { t.title = v; }),
-      field("학년", t.grade, (v) => { t.grade = v; }, { type: "number", min: 1, max: 9 }),
+      field("학년", t.grade, (v) => { t.grade = Number(v); }, { type: "number", min: 1, max: 9 }),
     ]));
     card.append(el("label", { class: "muted small", style: "display:block;margin-top:8px;font-weight:700" }, "반과 모둠 수 (모둠 코드는 학년+반+모둠 두 자리, 예: 6101)"));
     const list = el("div", {});
@@ -123,6 +123,16 @@ export function createEditor(container, ctx) {
   }
 
   // ------------------------------------------------ 섹션: 일정
+  // 날짜를 옮기거나 지우거나 더한 뒤 '1일차, 2일차…' 이름을 순서대로 다시 매긴다.
+  // 직접 지은 이름(예: '수학여행 준비', '출발일')은 그대로 두고 번호에서도 빼므로, 준비 날짜를 맨 앞에 두어도 여행 날짜 번호는 1일차부터 유지된다.
+  function renumberDays() {
+    let n = 0;
+    (draft.trip.days || []).forEach((d, i) => {
+      const auto = !d.label || /^\d+일차$/.test(d.label);
+      if (auto) { n += 1; d.day = n; d.label = `${n}일차`; }
+      else d.day = i + 1;
+    });
+  }
   function sectionSchedule() {
     const t = draft.trip;
     const wrap = el("div", {});
@@ -132,11 +142,11 @@ export function createEditor(container, ctx) {
       const card = el("div", { class: "card", "data-jump-id": `day-${di}` });
       card.append(el("h2", {}, [el("span", { class: "ttl" }, day.label || `${day.day}일차`), el("span", { class: "sp" }),
         el("div", { class: "card-actions" }, [
-          el("button", { class: "btn small ghost icon", "aria-label": "위로", disabled: di === 0, onclick: () => { moveItem(t.days, di, -1); markDirty(); render(); } }, "↑"),
-          el("button", { class: "btn small ghost icon", "aria-label": "아래로", disabled: di === t.days.length - 1, onclick: () => { moveItem(t.days, di, 1); markDirty(); render(); } }, "↓"),
+          el("button", { class: "btn small ghost icon", "aria-label": "위로", disabled: di === 0, onclick: () => { moveItem(t.days, di, -1); renumberDays(); markDirty(); render(); } }, "↑"),
+          el("button", { class: "btn small ghost icon", "aria-label": "아래로", disabled: di === t.days.length - 1, onclick: () => { moveItem(t.days, di, 1); renumberDays(); markDirty(); render(); } }, "↓"),
           el("button", { class: "btn small ghost danger", onclick: () => {
             if (!confirm(`${day.label || day.day + "일차"} 전체를 삭제할까요?`)) return;
-            t.days.splice(di, 1); markDirty(); render();
+            t.days.splice(di, 1); renumberDays(); markDirty(); render();
           } }, "날짜 삭제"),
         ]),
       ]));
@@ -199,7 +209,7 @@ export function createEditor(container, ctx) {
     wrap.append(el("div", { class: "ed-actions" }, el("button", { class: "btn small", onclick: () => {
       const n = (t.days || []).length + 1;
       t.days = t.days || [];
-      t.days.push({ day: n, label: `${n}일차`, date: "", stops: [] });
+      t.days.push({ day: n, label: `${n}일차`, date: "", stops: [] }); renumberDays();
       markDirty(); render();
     } }, "+ 날짜 추가")));
     return wrap;
@@ -214,7 +224,7 @@ export function createEditor(container, ctx) {
       el("div", { class: "card-actions", style: "margin-left:auto;flex:none" }, [
         el("button", { class: "btn small ghost icon", "aria-label": "위로", onclick: () => { moveItem(p.missions, mi, -1); markDirty(); render(); } }, "↑"),
         el("button", { class: "btn small ghost icon", "aria-label": "아래로", onclick: () => { moveItem(p.missions, mi, 1); markDirty(); render(); } }, "↓"),
-        el("button", { class: "btn small ghost danger", onclick: () => { if (confirm(`"${m.title}" 미션을 삭제할까요?`)) { p.missions.splice(mi, 1); markDirty(); render(); } } }, "삭제"),
+        el("button", { class: "btn small ghost danger", onclick: () => { if (confirm(`"${m.title}" 미션을 삭제할까요?${usageNote([m.id])}`)) { p.missions.splice(mi, 1); markDirty(); render(); } } }, "삭제"),
       ]),
     ]));
     card.append(el("div", { class: "ed-row two" }, [
@@ -238,7 +248,13 @@ export function createEditor(container, ctx) {
         box.append(el("div", { class: "opt-row" }, [
           el("input", { type: "radio", name: `ans-${m.id}`, checked: m.answer === oi, onchange: () => { m.answer = oi; markDirty(); } }),
           el("input", { class: "input", value: opt, placeholder: `보기 ${oi + 1}`, oninput: (e) => { m.options[oi] = e.target.value; markDirty(); } }),
-          el("button", { class: "btn small ghost danger icon", "aria-label": "보기 삭제", onclick: () => { m.options.splice(oi, 1); if (m.answer >= m.options.length) m.answer = 0; markDirty(); render(); } }, "✕"),
+          el("button", { class: "btn small ghost danger icon", "aria-label": "보기 삭제", onclick: () => {
+            if (oi === m.answer && !confirm("정답으로 고른 보기입니다. 지우면 정답을 다시 골라야 해요. 지울까요?")) return;
+            m.options.splice(oi, 1);
+            if (oi < m.answer) m.answer -= 1; else if (oi === m.answer) m.answer = 0; // 정답 앞의 보기를 지우면 번호를 당긴다
+            if (m.answer >= m.options.length) m.answer = 0;
+            markDirty(); render();
+          } }, "✕"),
         ]));
       });
       box.append(el("div", { class: "ed-actions" }, el("button", { class: "btn small", onclick: () => { m.options.push(""); markDirty(); render(); } }, "+ 보기 추가")));
@@ -266,13 +282,14 @@ export function createEditor(container, ctx) {
           const def = await loadDefaultData();
           const dp = def.places && def.places[id];
           if (!dp) { alert("기본 파일에 같은 장소가 없습니다."); return; }
-          if (!confirm(`"${p.name}"의 이름·안내문·미션을 기본 파일 내용으로 바꿀까요? 다른 장소와 일정은 그대로 둡니다.`)) return;
+          const lost = (p.missions || []).map((m) => m.id).filter((mid) => !(dp.missions || []).some((dm) => dm.id === mid));
+          if (!confirm(`"${p.name}"의 이름·안내문·미션을 기본 파일 내용으로 바꿀까요? 다른 장소와 일정은 그대로 둡니다.${usageNote(lost)}`)) return;
           draft.places[id] = clone(dp);
           markDirty(); render();
         } }, "기본 파일에서 가져오기"),
         el("button", { class: "btn small ghost danger", onclick: () => {
         const used = (draft.trip.days || []).some((d) => (d.stops || []).some((s) => s.placeId === id));
-        if (!confirm(`"${p.name}" 장소를 삭제할까요?${used ? " 일정에서도 함께 빠집니다." : ""}`)) return;
+        if (!confirm(`"${p.name}" 장소를 삭제할까요?${used ? " 일정에서도 함께 빠집니다." : ""}${usageNote((p.missions || []).map((m) => m.id))}`)) return;
         delete draft.places[id];
         for (const d of draft.trip.days || []) d.stops = (d.stops || []).filter((s) => s.placeId !== id);
         markDirty(); render();
@@ -338,10 +355,27 @@ export function createEditor(container, ctx) {
   }
 
   // ------------------------------------------------ 검사와 저장
+  // 미션에 이미 들어온 제출·도장 수를 경고문으로 만든다 (교사 화면이 알려 줄 때만)
+  function usageNote(missionIds) {
+    if (!ctx.usage) return "";
+    let subs = 0, stamps = 0;
+    for (const id of missionIds) { const u = ctx.usage(id); subs += u.subs; stamps += u.stamps; }
+    if (!subs && !stamps) return "";
+    return `\n\n주의: 이 미션에 이미 제출 ${subs}건, 도장 ${stamps}개가 있습니다. 지우면 학생 도장판과 현황에서 사라지고, 교사 화면의 '설정에 없는 미션의 제출'에서만 볼 수 있습니다.`;
+  }
   function validate() {
     const errs = [];
     if (!draft.trip.title) errs.push("여행 이름을 적어 주세요.");
     if (!(draft.trip.classes || []).length) errs.push("반을 하나 이상 추가해 주세요.");
+    const g = Number(draft.trip.grade);
+    if (!Number.isInteger(g) || g < 1 || g > 9) errs.push("학년은 1~9 사이의 숫자여야 합니다. (모둠 코드의 첫 자리)");
+    const seen = new Set();
+    for (const c of draft.trip.classes || []) {
+      const cls = Number(c.class), groups = Number(c.groups);
+      if (!Number.isInteger(cls) || cls < 1 || cls > 9) errs.push(`반 번호 "${c.class}"는 1~9 사이의 숫자여야 합니다. (모둠 코드의 둘째 자리)`);
+      else if (seen.has(cls)) errs.push(`${cls}반이 두 번 있습니다.`); else seen.add(cls);
+      if (!Number.isInteger(groups) || groups < 1 || groups > 99) errs.push(`${c.class}반의 모둠 수는 1~99 사이의 숫자여야 합니다.`);
+    }
     for (const [, p] of placeList()) {
       if (!p.name) errs.push("이름이 비어 있는 장소가 있습니다.");
       for (const m of p.missions || []) {
@@ -366,6 +400,20 @@ export function createEditor(container, ctx) {
     for (const [, p] of placeList()) for (const m of p.missions || []) {
       if (m.type === "choice") { const ansText = m.options[m.answer]; m.options = m.options.filter((o) => o.trim()); m.answer = Math.max(0, m.options.indexOf(ansText)); }
       if (!m.id) m.id = uniqueId("m");
+    }
+    saving = true; renderToolbarStatus();
+    if (!force) {
+      // 저장 직전에 서버의 마지막 저장 시각을 다시 확인한다 (신호가 약해 기본 파일로 열린 경우에도 남의 편집본을 덮어쓰지 않게)
+      const cur = await backend.loadConfig();
+      if (cur.ok && cur.data && cur.updatedAt && cur.updatedAt !== updatedAt) {
+        saving = false;
+        if (confirm("서버에 다른 선생님이 저장한 더 새로운 내용이 있습니다. 내 내용으로 덮어쓸까요? (취소하면 저장하지 않습니다. 새로고침하면 서버 내용을 볼 수 있습니다)")) return save(true);
+        statusText = "저장하지 않았습니다."; renderToolbarStatus(); return;
+      }
+      if (!cur.ok && source !== "server") {
+        saving = false;
+        if (!confirm("서버 설정을 확인하지 못했습니다(신호 약함). 그래도 저장하면 서버의 편집본을 덮어쓸 수 있습니다. 계속할까요?")) { statusText = "저장하지 않았습니다."; renderToolbarStatus(); return; }
+      }
     }
     saving = true; renderToolbarStatus();
     const r = await backend.saveConfig(draft, force ? null : updatedAt);
@@ -432,5 +480,13 @@ export function createEditor(container, ctx) {
   }
   render();
   window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
-  return { isDirty: () => dirty };
+  return {
+    isDirty: () => dirty,
+    // 다른 교사가 서버에 저장했음을 알린다 (편집 중인 내용은 그대로 두고 문구만)
+    notifyServerChange: (serverUpdatedAt) => {
+      if (serverUpdatedAt === updatedAt) return;
+      statusText = "다른 선생님이 방금 저장했습니다. 내 변경을 저장하면 덮어쓰기 확인이 뜹니다.";
+      renderToolbarStatus();
+    },
+  };
 }

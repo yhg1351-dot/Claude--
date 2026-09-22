@@ -104,7 +104,25 @@ async function load() {
   state.error = null;
   state.loadedAt = new Date();
   await refreshPhotoUrls();
+  await refreshConfig();
+  // 편집 중이거나 ZIP 을 받는 중에는 화면을 다시 그리지 않는다 (입력·진행 표시가 끊기지 않게)
+  if (state.tab === "edit" || zipJob.running) { updateLoadedAtLabel(); return; }
   render();
+}
+// 다른 교사가 저장한 설정을 받아온다. 편집 중(저장 안 된 변경)이면 덮어쓰지 않고 알린다.
+async function refreshConfig() {
+  try {
+    const r = await backend.loadConfig();
+    if (!r.ok || !r.data || !r.data.trip || !r.data.places) return;
+    if (r.updatedAt === state.dataUpdatedAt) return;
+    if (editorApi && editorApi.isDirty()) { editorApi.notifyServerChange(r.updatedAt); return; }
+    state.data = r.data; state.dataUpdatedAt = r.updatedAt; state.dataSource = "server";
+    editorBox = null; editorApi = null; // 편집 탭은 새 설정으로 다시 만든다
+  } catch (e) {}
+}
+function updateLoadedAtLabel() {
+  const elx = document.querySelector(".loaded-at");
+  if (elx && state.loadedAt) elx.textContent = `${fmtTime(state.loadedAt.toISOString())} 갱신`;
 }
 // 사진 임시 주소는 15분만 유효하다. 받은 지 10분이 지났거나 아직 없는 사진만 새로 받는다.
 const URL_TTL_MS = 10 * 60 * 1000;
@@ -119,11 +137,10 @@ async function refreshPhotoUrls() {
     }
   }
   if (!paths.length) return;
-  const fresh = await backend.signedUrls(paths);
-  for (const q of paths) {
-    if (fresh[q]) { state.urls[q] = fresh[q]; state.urlAt[q] = now; }
-    else if (q.endsWith("_t.jpg")) state.urlMissing[q] = true; // 미리보기 없음 → 다시 묻지 않음
-  }
+  const { urls: fresh, missing } = await backend.signedUrlsDetailed(paths);
+  for (const q of paths) if (fresh[q]) { state.urls[q] = fresh[q]; state.urlAt[q] = now; }
+  // 서버에 파일이 정말 없는 경로만 기억한다 (요청 실패는 다음 갱신 때 다시 시도)
+  for (const q of missing) state.urlMissing[q] = true;
 }
 function thumbPath(p) { return p.replace(/\.jpg$/, "_t.jpg"); }
 // 목록에 보여 줄 주소: 작은 미리보기가 있으면 그것, 없으면 원본
@@ -185,12 +202,18 @@ function render() {
 
 // 편집 탭: 화면을 다시 그려도 편집 중인 내용이 남도록 컨테이너를 재사용
 let editorBox = null;
+let editorApi = null;
 function viewEdit() {
   if (!editorBox) {
     editorBox = el("div");
-    createEditor(editorBox, {
+    editorApi = createEditor(editorBox, {
       data: state.data, updatedAt: state.dataUpdatedAt, source: state.dataSource,
       onSaved: (data, updatedAt) => { state.data = data; state.dataUpdatedAt = updatedAt; state.dataSource = "server"; },
+      // 미션을 지우거나 바꿀 때 경고에 쓸 제출·도장 수
+      usage: (missionId) => ({
+        subs: state.submissions.filter((x) => x.mission_id === missionId).length,
+        stamps: state.stamps.filter((x) => x.mission_id === missionId).length,
+      }),
     });
   }
   return editorBox;
@@ -239,7 +262,7 @@ function viewHeader() {
   return el("div", { class: "teacher-head" }, [
     el("div", { class: "teacher-top" }, [
       el("h1", {}, "교사 확인 화면"),
-      el("span", { class: "stamp" }, state.loadedAt ? `${fmtTime(state.loadedAt.toISOString())} 갱신` : ""),
+      el("span", { class: "stamp loaded-at" }, state.loadedAt ? `${fmtTime(state.loadedAt.toISOString())} 갱신` : ""),
       el("button", { class: "btn small icon", onclick: load, "aria-label": "새로고침", title: "새로고침" }, "↻"),
       el("button", { class: "btn small", onclick: async () => { await backend.teacherLogout(); state.loggedIn = false; render(); } }, "나가기"),
     ]),
@@ -324,8 +347,9 @@ function kpi(v, l) { return el("div", { class: "kpi" }, [el("div", { class: "v" 
 
 function viewByPlace() {
   const places = missionPlaces();
-  if (!state.placeFilter) state.placeFilter = places[0][0];
   const wrap = el("div");
+  if (!places.length) { wrap.append(el("p", { class: "muted", style: "padding:20px" }, "미션이 있는 장소가 없습니다. 편집 탭에서 미션을 추가하세요.")); wrap.append(orphanSection(null)); return wrap; }
+  if (!state.placeFilter || !places.some(([id]) => id === state.placeFilter)) state.placeFilter = places[0][0];
   wrap.append(el("div", { class: "tabs sub" }, places.map(([pid, p]) => el("button", { class: pid === state.placeFilter ? "active" : "", onclick: () => { state.placeFilter = pid; render(); } }, p.name))));
   wrap.append(el("div", { class: "tool-row", style: "margin:4px 0 8px" }, unstampedFilter()));
   const p = state.data.places[state.placeFilter];
@@ -348,6 +372,7 @@ function viewByPlace() {
     for (const c of submitted) card.append(subCard(sm.get(`${c}:${m.id}`), m, true));
     wrap.append(card);
   }
+  wrap.append(orphanSection(null));
   return wrap;
 }
 
@@ -369,7 +394,20 @@ function viewByGroup() {
     }
     wrap.append(card);
   }
+  wrap.append(orphanSection(state.groupSel));
   return wrap;
+}
+// 설정(편집)에서 사라진 미션에 남은 제출. 도장 처리와 사진 확인은 그대로 할 수 있다.
+function orphanSection(groupCode) {
+  const codes = filteredCodes();
+  const known = new Set(missionPlaces().flatMap(([, p]) => (p.missions || []).map((m) => m.id)));
+  const subs = state.submissions.filter((s) => !known.has(s.mission_id) && codes.includes(s.group_code) && (!groupCode || s.group_code === groupCode));
+  if (!subs.length) return el("div");
+  const card = el("div", { class: "card", style: "border:1px solid #f3d9a4" });
+  card.append(el("h2", {}, `설정에 없는 미션의 제출 ${subs.length}건`));
+  card.append(el("p", { class: "muted small" }, "편집에서 미션을 지우거나 '기본 파일에서 가져오기'로 바꾼 뒤 남은 제출입니다. 학생 도장판에는 보이지 않습니다."));
+  for (const s of subs) card.append(subCard(s, { id: s.mission_id, title: `(삭제된 미션) ${s.mission_id}`, type: "text", placeId: s.place_id, placeName: s.place_id }, !groupCode));
+  return card;
 }
 
 function subCard(s, m, showGroup) {
@@ -423,17 +461,17 @@ function viewTools() {
   const wrap = el("div");
   wrap.append(el("div", { class: "card" }, [
     el("h2", {}, "CSV 내려받기"),
-    el("p", { class: "muted" }, "모든 제출 내용을 엑셀에서 열 수 있는 파일로 저장합니다. 사진은 파일 이름만 포함됩니다."),
+    el("p", { class: "muted" }, `선택한 범위(${state.classFilter === "all" ? "전체" : state.classFilter + "반"})의 제출 내용을 엑셀에서 열 수 있는 파일로 저장합니다. 사진은 파일 이름만 포함되고, 시각은 한국 시각입니다.`),
     el("button", { class: "btn wide-auto", onclick: downloadCsv }, "CSV 내려받기"),
   ]));
   const codes = filteredCodes();
   const withPhotos = state.submissions.filter((s) => codes.includes(s.group_code) && (s.photo_paths || []).length);
   const photoTotal = withPhotos.reduce((n, s) => n + s.photo_paths.length, 0);
-  const prog = el("div", { class: "muted small", style: "margin-top:8px" });
+  const prog = el("div", { class: "muted small zip-prog", style: "margin-top:8px" }, zipJob.text);
   const scopeLabel = state.classFilter === "all" ? "전체" : `${state.classFilter}반`;
   const estMb = Math.round(photoTotal * 0.5);
   const zipBtn = el("button", { class: "btn wide-auto", onclick: () => downloadZip(withPhotos, prog, zipBtn) }, `${scopeLabel} 사진 ${photoTotal}장 ZIP으로 내려받기`);
-  if (!photoTotal) zipBtn.disabled = true;
+  if (!photoTotal || zipJob.running) zipBtn.disabled = true;
   const scopeChips = el("div", { class: "filter-chips zip-scope", style: "margin:8px 0" }, [
     el("button", { class: state.classFilter === "all" ? "active" : "", onclick: () => { state.classFilter = "all"; render(); } }, "전체"),
     ...state.data.trip.classes.map((c) => el("button", { class: state.classFilter === String(c.class) ? "active" : "", onclick: () => { state.classFilter = String(c.class); render(); } }, `${c.class}반`)),
@@ -477,21 +515,26 @@ function viewTools() {
 }
 
 // 사진을 모두 받아 ZIP 하나로 묶는다 (브라우저 안에서 처리, 서버 부담 없음)
+const zipJob = { running: false, text: "" };
+function setZipText(prog, text) { zipJob.text = text; prog.textContent = text; const live = document.querySelector(".zip-prog"); if (live && live !== prog) live.textContent = text; }
 async function downloadZip(subs, prog, btn) {
   if (!window.fflate) { alert("압축 기능을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요."); return; }
+  if (zipJob.running) return;
+  zipJob.running = true;
   btn.disabled = true;
   const files = {};
   let done = 0, failed = 0;
   const total = subs.reduce((n, s) => n + s.photo_paths.length, 0);
   const paths = subs.flatMap((s) => s.photo_paths);
-  prog.textContent = "사진 주소를 준비하는 중…";
+  setZipText(prog, "사진 주소를 준비하는 중…");
   const urls = await backend.signedUrls(paths);
   for (const s of subs) {
     const m = missionById(s.mission_id);
     const folder = `${s.group_code[0]}학년${s.group_code[1]}반/${parseInt(s.group_code.slice(2), 10)}모둠`;
     for (let i = 0; i < s.photo_paths.length; i++) {
       const url = urls[s.photo_paths[i]];
-      const name = `${folder}/${photoFileName(s, m, i)}`;
+      let name = `${folder}/${photoFileName(s, m, i)}`;
+      for (let k = 2; files[name]; k++) name = `${folder}/${photoFileName(s, m, i).replace(/\.jpg$/, `_${k}.jpg`)}`; // 같은 이름이면 번호를 붙인다
       try {
         if (!url) throw new Error("no url");
         const r = await fetch(url);
@@ -501,7 +544,7 @@ async function downloadZip(subs, prog, btn) {
         failed++;
       }
       done++;
-      prog.textContent = `받는 중 ${done}/${total}${failed ? ` (실패 ${failed})` : ""}`;
+      setZipText(prog, `받는 중 ${done}/${total}${failed ? ` (실패 ${failed})` : ""}`);
     }
   }
   try {
@@ -509,28 +552,38 @@ async function downloadZip(subs, prog, btn) {
     const blob = new Blob([zipped], { type: "application/zip" });
     const a = el("a", { href: URL.createObjectURL(blob), download: `수학여행_사진_${state.classFilter === "all" ? "전체" : state.classFilter + "반"}_${new Date().toISOString().slice(0, 10)}.zip` });
     document.body.append(a); a.click(); a.remove();
-    prog.textContent = `완료: ${done - failed}장 저장${failed ? `, ${failed}장 실패(다시 시도해 보세요)` : ""}`;
+    setZipText(prog, `완료: ${done - failed}장 저장${failed ? `, ${failed}장 실패(다시 시도해 보세요)` : ""}`);
   } catch (e) {
-    prog.textContent = "ZIP 생성에 실패했어요. 반을 나눠서 다시 시도해 주세요.";
+    setZipText(prog, "ZIP 생성에 실패했어요. 반을 나눠서 다시 시도해 주세요.");
   }
+  zipJob.running = false;
   btn.disabled = false;
+  if (state.tab === "tools") render();
 }
 
+function localTime(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const p2 = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
+}
 function downloadCsv() {
-  const rows = [["모둠코드", "반", "모둠", "장소", "미션", "유형", "답변", "정답여부", "사진수", "사진파일", "제출시각"]];
-  for (const s of state.submissions.slice().sort((a, b) => a.group_code.localeCompare(b.group_code) || a.mission_id.localeCompare(b.mission_id))) {
+  const codes = filteredCodes();
+  const rows = [["모둠코드", "반", "모둠", "장소", "미션", "유형", "답변", "정답여부", "도장", "사진수", "사진파일", "제출시각"]];
+  for (const s of state.submissions.filter((x) => codes.includes(x.group_code)).sort((a, b) => a.group_code.localeCompare(b.group_code) || a.mission_id.localeCompare(b.mission_id))) {
     const m = missionById(s.mission_id);
     const a = answerText(s, m);
     rows.push([
       s.group_code, s.group_code[1], String(parseInt(s.group_code.slice(2), 10)),
       m ? m.placeName : s.place_id, m ? m.title : s.mission_id, m ? m.type : "",
-      a.text, a.correct === null ? "" : a.correct ? "O" : "X",
-      String((s.photo_paths || []).length), (s.photo_paths || []).join(" "), s.updated_at || s.created_at || "",
+      a.text, a.correct === null ? "" : a.correct ? "O" : "X", isStamped(s) ? "O" : "",
+      String((s.photo_paths || []).length), (s.photo_paths || []).join(" "), localTime(s.updated_at || s.created_at),
     ]);
   }
   const csv = "﻿" + rows.map((r) => r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-  const a = el("a", { href: URL.createObjectURL(blob), download: `수학여행_제출내역_${new Date().toISOString().slice(0, 10)}.csv` });
+  const scope = state.classFilter === "all" ? "전체" : `${state.classFilter}반`;
+  const a = el("a", { href: URL.createObjectURL(blob), download: `수학여행_제출내역_${scope}_${new Date().toISOString().slice(0, 10)}.csv` });
   document.body.append(a); a.click(); a.remove();
 }
 
