@@ -118,8 +118,9 @@ textarea.input { min-height: 120px; resize: vertical; line-height: 1.6; }
 .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .ring .track { fill: none; stroke: rgba(255,255,255,.18); stroke-width: 8; }
 .ring .bar { fill: none; stroke: var(--gold); stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset .6s ease; }
-.ring .txt { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 900; font-size: 16px; line-height: 1; }
-.ring .txt small { display: block; font-size: 10px; opacity: .75; font-weight: 700; margin-top: 2px; }
+/* 퍼센트와 진행 수를 원의 정중앙에 붙여서 표시 */
+.ring .txt { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-weight: 900; font-size: 16px; line-height: 1; }
+.ring .txt small { display: block; font-size: 10px; opacity: .75; font-weight: 700; line-height: 1; }
 
 .day-title { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--ink-2); font-weight: 800; margin: 20px 0 6px; }
 .day-title::after { content: ""; flex: 1; height: 1px; background: var(--line); }
@@ -320,6 +321,10 @@ table.grid tr:last-child td { border-bottom: 0; }
 /* ---------- 정렬 규칙 ---------- */
 .card-actions { display: flex; gap: 4px; align-items: center; flex: none; }
 .app.wide .card > .btn:not(.small), .app.wide .card .btn.wide-auto { width: auto; min-width: 240px; }
+/* 교사 로그인 카드: 제목은 가운데, 버튼은 입력 칸과 같은 폭으로 */
+.teacher-login h2, .teacher-login > p.muted:first-of-type { text-align: center; }
+.app.wide .teacher-login > .btn:not(.small) { width: 100%; }
+.teacher-login .field label { display: block; margin-bottom: 6px; }
 .tool-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .editor .card > h2 { gap: 6px; }
 .editor .card > h2 .card-actions { margin-left: auto; }

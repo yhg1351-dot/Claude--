@@ -239,7 +239,7 @@ function viewLogin() {
   btn.addEventListener("click", doLogin);
   pw.addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
   const ib = installButton({ label: "📲 이 폰에 교사 화면 설치", title: "교사 화면을 홈 화면에 추가하기" });
-  return el("div", { style: "max-width:420px;margin:40px auto" }, el("div", { class: "card" }, [
+  return el("div", { style: "max-width:420px;margin:40px auto" }, el("div", { class: "card teacher-login" }, [
     el("h2", {}, "교사 확인 화면"),
     el("p", { class: "muted" }, state.data.trip.title),
     state.sessionMessage ? el("div", { class: "notice warn" }, state.sessionMessage) : null,
