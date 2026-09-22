@@ -177,19 +177,19 @@ begin
     return jsonb_build_object('ok', false, 'reason', 'invalid');
   end if;
   if p_mission_id is null or length(p_mission_id) > 64 or p_place_id is null or length(p_place_id) > 64 then
-    return jsonb_build_object('ok', false, 'reason', 'invalid');
+    return jsonb_build_object('ok', false, 'reason', 'bad_data');
   end if;
   if coalesce(array_length(p_photo_paths, 1), 0) > 6 then
-    return jsonb_build_object('ok', false, 'reason', 'invalid');
+    return jsonb_build_object('ok', false, 'reason', 'bad_data');
   end if;
   -- 사진 경로는 반드시 자기 모둠 폴더 안이어야 한다
   foreach p in array coalesce(p_photo_paths, '{}') loop
     if p !~ ('^' || v_code || '/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+\.jpg$') then
-      return jsonb_build_object('ok', false, 'reason', 'invalid');
+      return jsonb_build_object('ok', false, 'reason', 'bad_data');
     end if;
   end loop;
   if pg_column_size(p_answer) > 20000 then
-    return jsonb_build_object('ok', false, 'reason', 'invalid');
+    return jsonb_build_object('ok', false, 'reason', 'bad_data');
   end if;
 
   insert into public.submissions (id, group_code, place_id, mission_id, answer, photo_paths)
@@ -322,18 +322,18 @@ begin
     return jsonb_build_object('ok', false, 'reason', 'invalid');
   end if;
   if p_mission_id is null or length(p_mission_id) > 64 or p_place_id is null or length(p_place_id) > 64 then
-    return jsonb_build_object('ok', false, 'reason', 'invalid');
+    return jsonb_build_object('ok', false, 'reason', 'bad_data');
   end if;
   if coalesce(array_length(p_photo_paths, 1), 0) > 6 then
-    return jsonb_build_object('ok', false, 'reason', 'invalid');
+    return jsonb_build_object('ok', false, 'reason', 'bad_data');
   end if;
   foreach p in array coalesce(p_photo_paths, '{}') loop
     if p !~ ('^' || v_code || '/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+\.jpg$') then
-      return jsonb_build_object('ok', false, 'reason', 'invalid');
+      return jsonb_build_object('ok', false, 'reason', 'bad_data');
     end if;
   end loop;
   if pg_column_size(p_answer) > 20000 then
-    return jsonb_build_object('ok', false, 'reason', 'invalid');
+    return jsonb_build_object('ok', false, 'reason', 'bad_data');
   end if;
 
   insert into public.submissions (id, group_code, place_id, mission_id, answer, photo_paths)

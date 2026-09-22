@@ -128,6 +128,10 @@ function makeSupabase() {
     },
     // 이 기기만 로그아웃 (기본값 global 은 같은 계정의 다른 교사 기기까지 모두 로그아웃시킴)
     teacherLogout: () => client.auth.signOut({ scope: "local" }),
+    // 세션이 만료·폐기되어 로그아웃되면 알려 준다 (교사 화면이 빈 대시보드 대신 로그인 화면을 보이게)
+    onTeacherSignedOut(fn) {
+      try { client.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_OUT") fn(); }); } catch (e) {}
+    },
     async fetchAll() {
       try {
         const [subs, sess, st] = await Promise.all([
@@ -264,6 +268,11 @@ function makeLocal() {
       const all = sessions();
       const s = Object.values(all).find((x) => x.token === token || x.prev_token === token);
       if (!s) return { ok: false, reason: "invalid" };
+      // 서버 함수와 같은 검사: 사진은 6장까지, 경로는 자기 모둠 폴더 안이어야 한다
+      const paths = sub.photoPaths || [];
+      if (paths.length > 6 || paths.some((x) => !new RegExp(`^${s.code}/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+\\.jpg$`).test(x))) {
+        return { ok: false, reason: "bad_data" };
+      }
       const key = `${s.code}:${sub.missionId}`;
       const prev = await store.get("localSubmissions", key);
       await store.put("localSubmissions", {
@@ -277,6 +286,18 @@ function makeLocal() {
         created_at: prev ? prev.created_at : new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });
+      // 서버와 같은 자동 도장: 객관식 정답이면 자동 도장, 오답으로 다시 내면 자동 도장만 회수
+      try {
+        const row = ls.get("mq-local-config");
+        const data = row && row.data ? row.data : await (await fetch("./data/missions.json")).json();
+        const m = Object.values(data.places || {}).flatMap((pl) => pl.missions || []).find((x) => x.id === sub.missionId);
+        if (m && m.type === "choice" && sub.answer && sub.answer.choice !== undefined) {
+          const all = stampsAll(); const k = `${s.code}:${sub.missionId}`;
+          if (sub.answer.choice === m.answer) { if (!all[k]) all[k] = { auto: true, created_at: new Date().toISOString() }; }
+          else if (all[k] && all[k].auto) delete all[k];
+          ls.set(STAMP_KEY, all);
+        }
+      } catch (e) { /* 데모 모드 보조 기능 */ }
       return { ok: true };
     },
 
@@ -310,6 +331,7 @@ function makeLocal() {
     async teacherLogout() {
       ls.remove("mq-local-teacher");
     },
+    onTeacherSignedOut() {},
     async fetchAll() {
       const submissions = await store.all("localSubmissions");
       const sess = Object.values(sessions()).map((s) => ({

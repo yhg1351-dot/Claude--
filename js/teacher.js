@@ -85,7 +85,16 @@ function filteredCodes() {
 }
 
 // ------------------------------------------------------------ 데이터 불러오기
+function sessionExpired() {
+  if (!state.loggedIn) return;
+  state.loggedIn = false;
+  state.sessionMessage = "로그인이 만료되었어요. 교사 코드로 다시 로그인해 주세요. 데이터는 그대로 있어요.";
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+  render();
+}
 async function load() {
+  // 세션이 사라진 상태로 조회하면 오류 없이 빈 목록이 돌아오므로 먼저 확인한다
+  if (!(await backend.teacherSession())) { sessionExpired(); return; }
   const r = await backend.fetchAll();
   if (!r.ok) { state.error = r.message || "불러오기 실패"; render(); return; }
   state.submissions = r.submissions || [];
@@ -94,7 +103,6 @@ async function load() {
   state.stampsUnavailable = !!r.stampsUnavailable;
   state.error = null;
   state.loadedAt = new Date();
-  await backfillAutoStamps();
   await refreshPhotoUrls();
   render();
 }
@@ -125,21 +133,7 @@ function stampKey(code, mid) { return `${code}:${mid}`; }
 function stampMap() { const m = new Map(); for (const s of state.stamps) m.set(stampKey(s.group_code, s.mission_id), s); return m; }
 function allMissions() { return missionPlaces().flatMap(([, p]) => p.missions || []); }
 function stampCount(code) { const sm = stampMap(); return allMissions().filter((m) => sm.has(stampKey(code, m.id))).length; }
-// 퀴즈 정답인데 도장이 없는 제출에 자동 도장 (서버 함수가 못 찍은 경우의 보완)
-async function backfillAutoStamps() {
-  if (state.stampsUnavailable) return;
-  const sm = stampMap();
-  const todo = [];
-  for (const s of state.submissions) {
-    const m = missionById(s.mission_id);
-    if (!m || m.type !== "choice" || sm.has(stampKey(s.group_code, s.mission_id))) continue;
-    if (s.answer && s.answer.choice === m.answer) todo.push(s);
-  }
-  for (const s of todo) {
-    const r = await backend.setStamp(s.group_code, s.mission_id, true, { auto: true });
-    if (r.ok) state.stamps.push({ group_code: s.group_code, mission_id: s.mission_id, auto: true, created_at: new Date().toISOString() });
-  }
-}
+// 퀴즈 정답의 자동 도장은 서버(submit_answer)가 찍는다. 교사가 지운 도장을 화면이 되살리지 않도록 클라이언트 보완은 두지 않는다.
 async function toggleStamp(s, btn) {
   const sm = stampMap();
   const has = sm.has(stampKey(s.group_code, s.mission_id));
@@ -213,7 +207,7 @@ function viewLogin() {
     btn.disabled = true;
     const r = await backend.teacherLogin(simple ? fixedEmail : email.value.trim(), pw.value);
     btn.disabled = false;
-    if (r.ok) { state.loggedIn = true; render(); load(); startAutoRefresh(); }
+    if (r.ok) { state.loggedIn = true; state.sessionMessage = null; render(); load(); startAutoRefresh(); }
     else {
       err.textContent = r.reason === "auth" ? (simple ? "교사 코드가 맞지 않습니다." : "이메일 또는 비밀번호가 맞지 않습니다.") : `로그인 실패: ${r.message || ""}`;
       err.classList.remove("hidden");
@@ -225,6 +219,7 @@ function viewLogin() {
   return el("div", { style: "max-width:420px;margin:40px auto" }, el("div", { class: "card" }, [
     el("h2", {}, "교사 확인 화면"),
     el("p", { class: "muted" }, state.data.trip.title),
+    state.sessionMessage ? el("div", { class: "notice warn" }, state.sessionMessage) : null,
     inAppNotice("사진 저장과 홈 화면 설치가 잘 안 될 수 있으니 크롬이나 사파리로 열어 주세요."),
     !isConfigured ? el("div", { class: "notice info small" }, "데모 모드: 이 기기에서 제출한 내용만 보입니다. 비밀번호는 config.js의 localTeacherPassword 값입니다.") : null,
     isConfigured && !simple ? el("div", { class: "field" }, email) : null,
@@ -545,6 +540,7 @@ async function init() {
   const loaded = await loadTripData();
   state.data = loaded.data; state.dataUpdatedAt = loaded.updatedAt; state.dataSource = loaded.source;
   state.loggedIn = await backend.teacherSession();
+  backend.onTeacherSignedOut(sessionExpired);
   render();
   if (state.loggedIn) { load(); startAutoRefresh(); }
 }

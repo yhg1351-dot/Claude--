@@ -312,7 +312,8 @@ function errorCard(e) {
 }
 // 저장된 앱 정보(세션·캐시·서비스 워커)를 모두 지우고 새로 연다. 서버의 제출 기록은 그대로다.
 async function resetApp() {
-  try { Object.keys(localStorage).filter((k) => k.startsWith("mq-")).forEach((k) => localStorage.removeItem(k)); } catch (e) {}
+  // 기기 ID는 남긴다: 지우면 서버가 다른 폰으로 보고 5분 동안 대표 폰이 되지 못한다
+  try { Object.keys(localStorage).filter((k) => k.startsWith("mq-") && k !== "mq-device-id").forEach((k) => localStorage.removeItem(k)); } catch (e) {}
   try { if (window.caches) for (const k of await caches.keys()) await caches.delete(k); } catch (e) {}
   try { if (navigator.serviceWorker) for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); } catch (e) {}
   location.replace(location.pathname);
@@ -610,10 +611,11 @@ function viewPendingCard() {
   card.append(el("p", { class: "muted small" }, state.online ? "자동으로 다시 보내는 중이에요. 계속 안 되면 아래 오류 내용을 선생님께 보여 주세요." : "인터넷이 연결되면 자동으로 보내요."));
   for (const it of items) {
     const m = findMission(it.placeId, it.missionId);
-    card.append(el("div", { class: "notice warn small", style: "word-break:break-all" }, [
+    card.append(el("div", { class: `notice ${it.dead ? "error" : "warn"} small`, style: "word-break:break-all" }, [
       el("strong", {}, m ? m.title : it.missionId),
       ` · 사진 ${it.photoPaths.length}장 · 시도 ${it.attempts}회`,
-      it.lastError ? el("div", { style: "margin-top:4px" }, `오류: ${it.lastError}`) : null,
+      it.dead ? el("div", { style: "margin-top:4px" }, "서버가 이 제출을 받지 않았어요. 해당 미션을 열어 다시 제출하면 이 항목은 새 제출로 바뀌어요.")
+        : it.lastError ? el("div", { style: "margin-top:4px" }, `오류: ${it.lastError}`) : null,
     ]));
   }
   card.append(el("button", { class: "btn", onclick: async () => { syncMsg = "📤 다시 보내는 중…"; renderStatus(); await retryNow(); } }, "지금 다시 보내기"));
@@ -889,12 +891,12 @@ function renderStatus() {
 
 let pendingSig = "";
 async function refreshPending() {
-  const items = await pending();
+  const items = await pending(state.session ? state.session.code : undefined);
   state.pendingItems = items;
   state.pendingCount = items.length;
   renderStatus();
   // 대기 목록이 실제로 바뀌었을 때만 홈 화면을 다시 그린다
-  const sig = items.map((i) => `${i.id}:${i.attempts}:${i.lastError || ""}`).join("|");
+  const sig = items.map((i) => `${i.id}:${i.attempts}:${i.dead ? "x" : ""}:${i.lastError || ""}`).join("|");
   if (sig !== pendingSig) { pendingSig = sig; if (route().name === "home") render(); }
 }
 

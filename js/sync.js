@@ -83,14 +83,20 @@ export async function purgeStale(beforeIso) {
   return removed;
 }
 
-export async function pending() {
-  return (await store.all("outbox")).sort((a, b) => a.createdAt - b.createdAt);
+// code 를 주면 그 모둠의 항목만 (다른 모둠 코드로 접속 중일 때 섞이지 않게)
+export async function pending(code) {
+  return (await store.all("outbox")).filter((i) => !code || i.code === code).sort((a, b) => a.createdAt - b.createdAt);
+}
+// 전송 중에 같은 미션이 다시 제출되면 이 항목은 대기열에서 빠진다. 그 뒤엔 저장도 결과 반영도 하지 않는다.
+async function stillQueued(item) {
+  return !!(await store.get("outbox", item.id));
 }
 
 // 대기 중인 항목을 지금 바로 다시 보내기 (재시도 대기 시간 무시)
 export async function retryNow() {
   for (const item of await pending()) {
     item.nextAt = 0;
+    item.dead = false; // 서버가 내용을 거부했던 항목도 한 번 더 시도
     await store.put("outbox", item);
   }
   blockedByToken = false;
@@ -130,8 +136,10 @@ async function sendItem(item, token) {
       if (!rt.ok) return rt;
     }
     item.uploaded[i] = true;
+    if (!(await stillQueued(item))) return { ok: false, reason: "stale" };
     await store.put("outbox", item);
   }
+  if (!(await stillQueued(item))) return { ok: false, reason: "stale" };
   // 2) 답변 저장
   return backend.submit(token, {
     id: item.id,
@@ -151,16 +159,31 @@ async function process() {
       const session = ls.get("mq-session");
       if (!session || !session.token) break;
       if (!navigator.onLine) break;
-      const items = await pending();
+      const items = await pending(session.code); // 지금 접속한 모둠의 항목만
       const now = Date.now();
-      const item = items.find((i) => i.nextAt <= now);
+      const item = items.find((i) => i.nextAt <= now && !i.dead);
       if (!item) break;
 
       const r = await sendItem(item, session.token);
+      if (r.reason === "stale" || !(await stillQueued(item))) {
+        // 보내는 사이 같은 미션을 다시 제출해 이 항목은 대체됨 → 결과를 반영하지 않고 다음 항목으로
+        continue;
+      }
       if (r.ok) {
         await store.del("outbox", item.id);
         emit({ type: "sent", missionId: item.missionId, item });
+      } else if (r.reason === "bad_data" || (r.reason === "invalid" && (item.invalidCount || 0) >= 2)) {
+        // 서버가 내용 자체를 거부(사진 수 초과, 경로 불일치 등). 재접속해도 소용없으니 멈추고 알린다.
+        // (옛 서버 함수는 토큰 오류와 같은 'invalid' 를 주므로, 재접속 뒤에도 3번 연속이면 내용 오류로 본다)
+        item.dead = true;
+        item.attempts += 1;
+        item.lastError = "서버가 이 제출을 받지 않았어요. 미션에서 다시 제출해 주세요.";
+        await store.put("outbox", item);
+        emit({ type: "error", missionId: item.missionId, message: item.lastError, attempts: item.attempts });
+        continue;
       } else if (r.reason === "invalid") {
+        item.invalidCount = (item.invalidCount || 0) + 1;
+        await store.put("outbox", item);
         blockedByToken = true;
         emit({ type: "invalid_token" });
         break;
