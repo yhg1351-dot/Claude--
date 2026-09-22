@@ -184,8 +184,13 @@ function startAutoRefresh() {
 }
 
 // ------------------------------------------------------------ 화면
+// 다시 그리기 전의 스크롤 위치(세로 + 가로로 넘치는 칩 줄들)를 기억해 두었다가 되돌린다
+let lastTab = null;
 function render() {
   const app = $("#app");
+  const prevTab = lastTab;
+  const y = window.scrollY;
+  const bars = Array.from(app.querySelectorAll(".tabs, .filter-chips, .place-jump, .table-wrap")).map((b) => [b.className, b.scrollLeft]);
   app.innerHTML = "";
   if (!state.loggedIn) { app.append(viewLogin()); return; }
   app.append(viewHeader());
@@ -198,6 +203,22 @@ function render() {
   // 편집 화면의 고정 바가 상단 바 바로 아래에 붙도록 상단 바 높이를 알려 준다
   const top = app.querySelector(".teacher-top");
   if (top) document.documentElement.style.setProperty("--tt-h", `${top.offsetHeight}px`);
+  // 같은 탭을 다시 그린 것이면 세로 위치를 그대로, 탭을 바꿨으면 맨 위로
+  const sameTab = prevTab === state.tab;
+  lastTab = state.tab;
+  window.scrollTo(0, sameTab ? y : 0);
+  // 가로로 넘치는 칩 줄: 이전 위치로 되돌리고, 선택된 칩이 보이도록 맞춘다
+  const nowBars = Array.from(app.querySelectorAll(".tabs, .filter-chips, .place-jump, .table-wrap"));
+  nowBars.forEach((b) => {
+    const prev = bars.find((x) => x[0] === b.className);
+    if (prev) b.scrollLeft = prev[1];
+    const active = b.querySelector(".active");
+    if (active && b.scrollWidth > b.clientWidth) {
+      const left = active.offsetLeft - b.offsetLeft, right = left + active.offsetWidth;
+      if (left < b.scrollLeft) b.scrollLeft = Math.max(0, left - 12);
+      else if (right > b.scrollLeft + b.clientWidth) b.scrollLeft = right - b.clientWidth + 12;
+    }
+  });
 }
 
 // 편집 탭: 화면을 다시 그려도 편집 중인 내용이 남도록 컨테이너를 재사용
