@@ -37,7 +37,8 @@
   .sec { margin-bottom: 4mm; }
   .sec:last-child { margin-bottom: 0; }
   .sec > h2 { font-size: 11.5pt; font-weight: 900; margin: 0 0 1.5mm; display: flex; align-items: center; gap: 2mm; }
-  .sec > h2 .n { display: inline-grid; place-items: center; width: 6.5mm; height: 6.5mm; border-radius: 50%; background: var(--navy); color: #fff; font-size: 8.5pt; font-weight: 900; }
+  /* 문항 번호 대신 작은 표식만: 반마다 고르는 활동이 달라도 어색하지 않게 */
+  .sec > h2 .n { display: inline-block; width: 3.2mm; height: 3.2mm; border-radius: 1mm; background: var(--gold); transform: rotate(45deg); margin: 0 1mm; }
   .sec > h2 .hint { font-weight: 400; font-size: 8.5pt; color: var(--ink-2); margin-left: auto; }
   .lead { font-size: 9pt; color: var(--ink-2); margin: 0 0 1.5mm; }
   .box { border: 1px solid var(--line); border-radius: 2.5mm; padding: 2.5mm 3mm; }
@@ -126,7 +127,7 @@
   </div>
 
   <div class="sec">
-    <h2><span class="n">1</span>여행 길 되짚기 <span class="hint">순서대로 떠올리며, 그곳에서 가장 기억나는 한 장면을 한 줄로</span></h2>
+    <h2><span class="n"></span>여행 길 되짚기 <span class="hint">순서대로 떠올리며, 그곳에서 가장 기억나는 한 장면을 한 줄로</span></h2>
     <div class="route">
       <div class="stop"><div class="k">1일차 ①</div><div class="nm">불국사</div><div class="mini"></div></div>
       <div class="stop"><div class="k">1일차 ②</div><div class="nm">경주월드</div><div class="mini"></div></div>
@@ -137,7 +138,7 @@
   </div>
 
   <div class="sec">
-    <h2><span class="n">2</span>마음 온도계 <span class="hint">별을 색칠하고, 왜 그렇게 느꼈는지 적어 보세요</span></h2>
+    <h2><span class="n"></span>마음 온도계 <span class="hint">별을 색칠하고, 왜 그렇게 느꼈는지 적어 보세요</span></h2>
     <table class="temp">
       <tr><th style="width:30mm">장소</th><th style="width:34mm">즐거움</th><th>그렇게 느낀 이유</th></tr>
       <tr><td>불국사</td><td class="stars">☆☆☆☆☆</td><td class="why"></td></tr>
@@ -149,7 +150,7 @@
   </div>
 
   <div class="sec">
-    <h2><span class="n">3</span>우리 모둠 미션 스탬프 <span class="hint">앱 도장판을 보고 받은 도장을 색칠하세요</span></h2>
+    <h2><span class="n"></span>우리 모둠 미션 스탬프 <span class="hint">앱 도장판을 보고 받은 도장을 색칠하세요</span></h2>
     <div class="stamps">
       <div class="s"><div class="c">1</div>다보탑의 돌사자</div>
       <div class="s"><div class="c">2</div>석가탑 속 보물</div>
@@ -181,7 +182,7 @@
   </div>
 
   <div class="sec">
-    <h2><span class="n">4</span>앱에서 풀었던 문제, 이번엔 손으로 <span class="hint">기억을 더듬어 답을 써 보세요</span></h2>
+    <h2><span class="n"></span>앱에서 풀었던 문제, 이번엔 손으로 <span class="hint">기억을 더듬어 답을 써 보세요</span></h2>
     <table class="quiz">
       <tr><td class="q">① 다보탑 기단 위 모서리의 돌사자는 원래 4마리였어요. 지금 남아 있는 것은 몇 마리일까요?</td><td class="a"></td></tr>
       <tr><td class="q">② 석가탑을 고치다가 발견된, 세계에서 가장 오래된 목판 인쇄물의 이름은?</td><td class="a"></td></tr>
@@ -192,7 +193,7 @@
   </div>
 
   <div class="sec">
-    <h2><span class="n">5</span>다보탑과 석가탑, 닮은 점과 다른 점 <span class="hint">기억나는 대로 그리고, 특징을 비교해요</span></h2>
+    <h2><span class="n"></span>다보탑과 석가탑, 닮은 점과 다른 점 <span class="hint">기억나는 대로 그리고, 특징을 비교해요</span></h2>
     <div class="cmp">
       <div class="draw"><div class="cap">다보탑</div><div class="sub">화려하고 복잡한 모양 · 돌사자</div></div>
       <div class="draw"><div class="cap">석가탑 (불국사 삼층석탑)</div><div class="sub">단순하고 균형 잡힌 모양</div></div>
@@ -205,7 +206,7 @@
   </div>
 
   <div class="sec">
-    <h2><span class="n">6</span>문화재 해설사 되기 <span class="hint">3학년 동생에게 설명한다고 생각하고 써 보세요</span></h2>
+    <h2><span class="n"></span>문화재 해설사 되기 <span class="hint">3학년 동생에게 설명한다고 생각하고 써 보세요</span></h2>
     <p class="lead">내가 고른 문화재: <span class="tag">다보탑</span> <span class="tag">석가탑</span> <span class="tag">성덕대왕신종</span> <span class="tag">신라 금관</span> <span class="tag">청운교·백운교</span> <span class="tag">내가 고른 유물 (<span class="fill" style="min-width:18mm;height:5mm"></span>)</span></p>
     <div class="box"><div class="lines h6"></div></div>
     <p class="lead" style="margin:1.5mm 0 0">✍️ 이렇게 시작해 보세요: "이 문화재는 ______ 시대에 만든 것인데, 가장 신기한 점은 ______이야. 왜냐하면 ______"</p>
@@ -222,7 +223,7 @@
   </div>
 
   <div class="sec">
-    <h2><span class="n">7</span>오감으로 떠올리기 <span class="hint">단어나 짧은 구절로 적어도 좋아요</span></h2>
+    <h2><span class="n"></span>오감으로 떠올리기 <span class="hint">단어나 짧은 구절로 적어도 좋아요</span></h2>
     <div class="senses">
       <div class="s"><div class="ic">👀</div><div class="label">본 것</div><div class="lines"></div></div>
       <div class="s"><div class="ic">👂</div><div class="label">들은 소리</div><div class="lines"></div></div>
@@ -233,7 +234,7 @@
   </div>
 
   <div class="sec">
-    <h2><span class="n">8</span>여행 일기 또는 편지 <span class="hint">둘 중 하나를 골라 ✔ 표시하고 쓰세요</span></h2>
+    <h2><span class="n"></span>여행 일기 또는 편지 <span class="hint">둘 중 하나를 골라 ✔ 표시하고 쓰세요</span></h2>
     <p class="lead"><span class="chk"></span>여행 중 가장 기억에 남는 하루의 일기 &nbsp;&nbsp; <span class="chk"></span>고마운 사람(부모님·친구·선생님·기사님)에게 쓰는 편지 &nbsp;&nbsp; <span class="chk"></span>신라 사람에게 보내는 편지</p>
     <div class="box">
       <div style="display:flex;gap:3mm;align-items:baseline;margin-bottom:1mm"><span class="label" style="margin:0">제목</span><span class="fill" style="flex:1"></span></div>
@@ -242,7 +243,7 @@
   </div>
 
   <div class="sec">
-    <h2><span class="n">9</span>내 마음속 사진 한 장 <span class="hint">가장 남기고 싶은 장면을 그리고 제목을 붙여요</span></h2>
+    <h2><span class="n"></span>내 마음속 사진 한 장 <span class="hint">가장 남기고 싶은 장면을 그리고 제목을 붙여요</span></h2>
     <div class="photo">
       <div class="frame"><div class="cap">📷 여기에 그 장면을 그려요 (우리 모둠 인증샷도 좋아요)</div></div>
       <div>
@@ -264,7 +265,7 @@
   </div>
 
   <div class="sec">
-    <h2><span class="n">10</span>우리 모둠 되돌아보기 <span class="hint">솔직하게, 그러나 친절하게</span></h2>
+    <h2><span class="n"></span>우리 모둠 되돌아보기 <span class="hint">솔직하게, 그러나 친절하게</span></h2>
     <div class="grid2">
       <div class="box"><div class="label">우리 모둠이 잘한 점 (예: 대표 폰 정하기, 길 찾기, 사진 찍기)</div><div class="lines" style="--lh:7.5mm;height:calc(7.5mm*3)"></div></div>
       <div class="box"><div class="label">다음에는 이렇게 하고 싶어요</div><div class="lines" style="--lh:7.5mm;height:calc(7.5mm*3)"></div></div>
@@ -275,7 +276,7 @@
   </div>
 
   <div class="sec">
-    <h2><span class="n">11</span>옛날에도, 지금도 <span class="hint">박물관 미션을 이어서: 신라의 물건과 오늘날의 물건을 짝지어요</span></h2>
+    <h2><span class="n"></span>옛날에도, 지금도 <span class="hint">박물관 미션을 이어서: 신라의 물건과 오늘날의 물건을 짝지어요</span></h2>
     <table class="pair">
       <tr><th style="width:36%">박물관에서 본 신라의 물건</th><th style="width:36%">오늘날의 비슷한 물건</th><th>달라진 점 · 같은 점</th></tr>
       <tr><td></td><td></td><td></td></tr>
@@ -289,7 +290,7 @@
   </div>
 
   <div class="sec">
-    <h2><span class="n">12</span>다음 여행을 계획해요 <span class="hint">이번 여행에서 배운 것을 살려서</span></h2>
+    <h2><span class="n"></span>다음 여행을 계획해요 <span class="hint">이번 여행에서 배운 것을 살려서</span></h2>
     <div class="grid3">
       <div class="box"><div class="label">가고 싶은 곳과 이유</div><div class="lines" style="--lh:7.5mm;height:calc(7.5mm*3)"></div></div>
       <div class="box"><div class="label">꼭 챙길 준비물 3가지</div><div class="lines" style="--lh:7.5mm;height:calc(7.5mm*3)"></div></div>
