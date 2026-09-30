@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>경주 수학여행 되돌아보기 활동지</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  /* ---------- A4 세로 인쇄 규격 ---------- */
+  @page { size: A4 portrait; margin: 0; }
+  :root {
+    --ink: #1c2033; --ink-2: #4b5068; --line: #b9b4a6; --line-soft: #ddd8cb;
+    --navy: #1d2440; --gold: #b98a1e; --gold-soft: #f6efd9; --paper: #fff; --soft: #f4f1ea;
+    --lh: 9mm; /* 연필 글쓰기 줄 간격 */
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #e9e6df; color: var(--ink); font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "맑은 고딕", sans-serif; font-size: 10.5pt; line-height: 1.45; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { width: 210mm; height: 297mm; padding: 11mm 12mm 10mm; margin: 8mm auto; background: var(--paper); position: relative; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 6px 24px rgba(0,0,0,.12); }
+  @media print {
+    body { background: #fff; }
+    .page { margin: 0; box-shadow: none; page-break-after: always; break-after: page; }
+    .page:last-child { page-break-after: auto; break-after: auto; }
+    .screen-only { display: none !important; }
+  }
+
+  /* ---------- 공통 부품 ---------- */
+  .top { display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 2.5px solid var(--navy); padding-bottom: 3mm; margin-bottom: 4mm; }
+  .top .t { font-size: 17pt; font-weight: 900; letter-spacing: -.02em; line-height: 1.15; }
+  .top .t small { display: block; font-size: 8.5pt; font-weight: 700; color: var(--gold); letter-spacing: .12em; margin-bottom: 1mm; }
+  .top .pg { font-size: 8.5pt; color: var(--ink-2); font-weight: 700; }
+  .idbox { display: flex; gap: 2mm; margin-bottom: 4mm; }
+  .idbox .cell { flex: 1; border: 1px solid var(--line); border-radius: 2mm; padding: 1.5mm 2.5mm; display: flex; align-items: center; gap: 2mm; min-height: 9mm; }
+  .idbox .cell b { font-size: 9pt; color: var(--ink-2); white-space: nowrap; }
+  .idbox .cell span { flex: 1; border-bottom: 1px solid var(--line-soft); height: 6mm; }
+  .sec { margin-bottom: 4mm; }
+  .sec:last-child { margin-bottom: 0; }
+  .sec > h2 { font-size: 11.5pt; font-weight: 900; margin: 0 0 1.5mm; display: flex; align-items: center; gap: 2mm; }
+  .sec > h2 .n { display: inline-grid; place-items: center; width: 6.5mm; height: 6.5mm; border-radius: 50%; background: var(--navy); color: #fff; font-size: 8.5pt; font-weight: 900; }
+  .sec > h2 .hint { font-weight: 400; font-size: 8.5pt; color: var(--ink-2); margin-left: auto; }
+  .lead { font-size: 9pt; color: var(--ink-2); margin: 0 0 1.5mm; }
+  .box { border: 1px solid var(--line); border-radius: 2.5mm; padding: 2.5mm 3mm; }
+  .lines { background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--lh) - 1px), var(--line-soft) calc(var(--lh) - 1px), var(--line-soft) var(--lh)); background-size: 100% var(--lh); line-height: var(--lh); }
+  .lines.h4 { height: calc(var(--lh) * 4); } .lines.h5 { height: calc(var(--lh) * 5); } .lines.h6 { height: calc(var(--lh) * 6); }
+  .lines.h7 { height: calc(var(--lh) * 7); } .lines.h9 { height: calc(var(--lh) * 9); } .lines.h11 { height: calc(var(--lh) * 11); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3mm; }
+  .grid5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2mm; }
+  .label { font-size: 9pt; font-weight: 700; color: var(--ink-2); margin-bottom: 1mm; }
+  .stars { letter-spacing: 1.5px; font-size: 12pt; color: var(--line); }
+  .fill { border-bottom: 1px solid var(--line); display: inline-block; min-width: 22mm; height: 6mm; vertical-align: bottom; }
+  .tag { display: inline-block; font-size: 8pt; font-weight: 700; padding: .5mm 2mm; border-radius: 99px; background: var(--gold-soft); color: var(--gold); border: 1px solid #e6d7a3; }
+  .foot { margin-top: auto; padding-top: 2mm; border-top: 1px dashed var(--line-soft); font-size: 8pt; color: var(--ink-2); display: flex; justify-content: space-between; }
+  .chk { display: inline-block; width: 4.2mm; height: 4.2mm; border: 1.2px solid var(--ink); border-radius: 1mm; vertical-align: -1mm; margin-right: 1.5mm; }
+
+  /* 1쪽: 여행 길 */
+  .route { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2mm; }
+  .route .stop { border: 1px solid var(--line); border-radius: 2.5mm; padding: 2mm; min-height: 34mm; position: relative; }
+  .route .stop .k { font-size: 8pt; color: var(--gold); font-weight: 900; }
+  .route .stop .nm { font-size: 10pt; font-weight: 900; margin-bottom: 1.5mm; }
+  .route .stop .mini { height: calc(6.5mm * 3); background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(6.5mm - 1px), var(--line-soft) calc(6.5mm - 1px), var(--line-soft) 6.5mm); }
+  .temp { width: 100%; border-collapse: collapse; font-size: 9pt; }
+  .temp th, .temp td { border: 1px solid var(--line); padding: 1.6mm 2mm; text-align: left; vertical-align: middle; }
+  .temp th { background: var(--soft); font-weight: 700; }
+  .temp td.why { height: 11.5mm; }
+  .stamps { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2mm 1.5mm; }
+  .stamps .s { text-align: center; font-size: 7.5pt; line-height: 1.2; color: var(--ink-2); }
+  .stamps .s .c { width: 13mm; height: 13mm; border-radius: 50%; border: 1.5px dashed var(--line); margin: 0 auto 1mm; display: grid; place-items: center; font-weight: 900; color: var(--line); font-size: 9pt; }
+
+  /* 2쪽: 문화재 */
+  .quiz { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+  .quiz td { border: 1px solid var(--line); padding: 1.8mm 2mm; vertical-align: middle; }
+  .quiz td.q { width: 70%; }
+  .quiz td.a { height: 9mm; }
+  .cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; }
+  .cmp .draw { border: 1px solid var(--line); border-radius: 2.5mm; height: 47mm; position: relative; }
+  .cmp .draw .cap { position: absolute; left: 2mm; top: 1.5mm; font-size: 9pt; font-weight: 900; }
+  .cmp .draw .sub { position: absolute; left: 2mm; top: 6mm; font-size: 7.5pt; color: var(--ink-2); }
+  .venn { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2mm; margin-top: 2mm; }
+  .venn .v { border: 1px solid var(--line); border-radius: 2.5mm; padding: 1.5mm 2mm; }
+  .venn .v .label { text-align: center; }
+  .venn .v .lines { --lh: 7.5mm; height: calc(7.5mm * 3); }
+
+  /* 3쪽: 오감·일기 */
+  .senses { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2mm; }
+  .senses .s { border: 1px solid var(--line); border-radius: 2.5mm; padding: 1.5mm 2mm; }
+  .senses .s .ic { font-size: 14pt; text-align: center; }
+  .senses .s .label { text-align: center; }
+  .senses .s .lines { --lh: 7.5mm; height: calc(7.5mm * 3); }
+  .photo { display: grid; grid-template-columns: 62mm 1fr; gap: 3mm; }
+  .photo .frame { border: 1.5px solid var(--ink); height: 52mm; position: relative; background: repeating-linear-gradient(45deg, transparent 0 4mm, #f2efe6 4mm 4.6mm); }
+  .photo .frame .cap { position: absolute; left: 0; right: 0; bottom: 0; background: #fff; font-size: 7.5pt; text-align: center; padding: 1mm; color: var(--ink-2); }
+
+  /* 4쪽: 모둠·상상·계획 */
+  .pair { width: 100%; border-collapse: collapse; font-size: 9pt; }
+  .pair th, .pair td { border: 1px solid var(--line); padding: 1.6mm 2mm; }
+  .pair th { background: var(--soft); text-align: left; }
+  .pair td { height: 10.5mm; }
+  .selfchk { display: grid; grid-template-columns: 1fr auto; gap: 1mm 3mm; align-items: center; font-size: 9pt; }
+  .selfchk .opts { white-space: nowrap; letter-spacing: 2px; }
+  .seal { width: 22mm; height: 22mm; border: 1.5px dashed var(--line); border-radius: 50%; display: grid; place-items: center; font-size: 7.5pt; color: var(--ink-2); text-align: center; line-height: 1.2; }
+
+  /* 화면에서만 보이는 안내 */
+  .screen-only { max-width: 210mm; margin: 6mm auto 0; font-size: 9.5pt; color: #4b5068; background: #fff; border-radius: 3mm; padding: 4mm 5mm; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+  .screen-only button { font: inherit; font-weight: 700; padding: 2mm 5mm; border-radius: 2mm; border: 1.5px solid var(--navy); background: var(--navy); color: #fff; cursor: pointer; margin-right: 2mm; }
+</style>
+</head>
+<body>
+
+<div class="screen-only">
+  <button onclick="window.print()">🖨️ 인쇄하기 (A4 세로)</button>
+  인쇄 창에서 <b>용지 A4, 여백 없음(또는 기본), 배경 그래픽 인쇄 켜기</b>로 두면 아래 4쪽이 그대로 나옵니다. 양면 인쇄를 하면 두 장으로 접을 수 있어요.
+</div>
+
+<!-- ===================================================== 1쪽 -->
+<section class="page">
+  <div class="top">
+    <div class="t"><small>GYEONGJU FIELD TRIP · 되돌아보기</small>경주 수학여행, 다시 걷기</div>
+    <div class="pg">1 / 4</div>
+  </div>
+  <div class="idbox">
+    <div class="cell"><b>6학년</b><span></span><b>반</b><span></span><b>모둠</b></div>
+    <div class="cell"><b>이름</b><span></span></div>
+    <div class="cell"><b>날짜</b><span></span></div>
+  </div>
+
+  <div class="sec">
+    <h2><span class="n">1</span>여행 길 되짚기 <span class="hint">순서대로 떠올리며, 그곳에서 가장 기억나는 한 장면을 한 줄로</span></h2>
+    <div class="route">
+      <div class="stop"><div class="k">1일차 ①</div><div class="nm">불국사</div><div class="mini"></div></div>
+      <div class="stop"><div class="k">1일차 ②</div><div class="nm">경주월드</div><div class="mini"></div></div>
+      <div class="stop"><div class="k">1일차 ③</div><div class="nm">숙소</div><div class="mini"></div></div>
+      <div class="stop"><div class="k">2일차 ④</div><div class="nm">국립경주박물관</div><div class="mini"></div></div>
+      <div class="stop"><div class="k">2일차 ⑤</div><div class="nm">쿠우쿠우 · 학교</div><div class="mini"></div></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2><span class="n">2</span>마음 온도계 <span class="hint">별을 색칠하고, 왜 그렇게 느꼈는지 적어 보세요</span></h2>
+    <table class="temp">
+      <tr><th style="width:30mm">장소</th><th style="width:34mm">즐거움</th><th>그렇게 느낀 이유</th></tr>
+      <tr><td>불국사</td><td class="stars">☆☆☆☆☆</td><td class="why"></td></tr>
+      <tr><td>경주월드</td><td class="stars">☆☆☆☆☆</td><td class="why"></td></tr>
+      <tr><td>숙소에서의 밤</td><td class="stars">☆☆☆☆☆</td><td class="why"></td></tr>
+      <tr><td>국립경주박물관</td><td class="stars">☆☆☆☆☆</td><td class="why"></td></tr>
+      <tr><td>버스 안 · 식사 시간</td><td class="stars">☆☆☆☆☆</td><td class="why"></td></tr>
+    </table>
+  </div>
+
+  <div class="sec">
+    <h2><span class="n">3</span>우리 모둠 미션 스탬프 <span class="hint">앱 도장판을 보고 받은 도장을 색칠하세요</span></h2>
+    <div class="stamps">
+      <div class="s"><div class="c">1</div>다보탑의 돌사자</div>
+      <div class="s"><div class="c">2</div>석가탑 속 보물</div>
+      <div class="s"><div class="c">3</div>우리 모둠 인증샷</div>
+      <div class="s"><div class="c">4</div>안전 먼저!</div>
+      <div class="s"><div class="c">5</div>모둠 손 모으기</div>
+      <div class="s"><div class="c">6</div>함께 탄 놀이기구</div>
+      <div class="s"><div class="c">7</div>종소리에 담긴 이야기</div>
+      <div class="s"><div class="c">8</div>황금 왕관을 찾아라</div>
+      <div class="s"><div class="c">9</div>유물 탐정</div>
+      <div class="s"><div class="c">10</div>신라 왕의 무덤</div>
+      <div class="s"><div class="c">11</div>옛날에도, 지금도</div>
+      <div class="s"><div class="c">12</div>(우리 반 미션)</div>
+    </div>
+    <div class="grid2" style="margin-top:2.5mm">
+      <div class="box"><div class="label">가장 재미있었던 미션과 그 이유</div><div class="lines" style="--lh:7.5mm;height:calc(7.5mm*3)"></div></div>
+      <div class="box"><div class="label">가장 어려웠던 미션과 해결한 방법</div><div class="lines" style="--lh:7.5mm;height:calc(7.5mm*3)"></div></div>
+    </div>
+  </div>
+
+  <div class="foot"><span>6학년 경주 수학여행 되돌아보기 활동지</span><span>연필로 또박또박, 틀려도 괜찮아요</span></div>
+</section>
+
+<!-- ===================================================== 2쪽 -->
+<section class="page">
+  <div class="top">
+    <div class="t"><small>천 년 신라의 보물</small>신라의 보물, 내가 설명해요</div>
+    <div class="pg">2 / 4</div>
+  </div>
+
+  <div class="sec">
+    <h2><span class="n">4</span>앱에서 풀었던 문제, 이번엔 손으로 <span class="hint">기억을 더듬어 답을 써 보세요</span></h2>
+    <table class="quiz">
+      <tr><td class="q">① 다보탑 기단 위 모서리의 돌사자는 원래 4마리였어요. 지금 남아 있는 것은 몇 마리일까요?</td><td class="a"></td></tr>
+      <tr><td class="q">② 석가탑을 고치다가 발견된, 세계에서 가장 오래된 목판 인쇄물의 이름은?</td><td class="a"></td></tr>
+      <tr><td class="q">③ 성덕대왕신종을 부르는 또 다른 이름은?</td><td class="a"></td></tr>
+      <tr><td class="q">④ 나무 방 위에 돌을 쌓고 흙을 덮어 만든 신라 왕들의 무덤 방식은?</td><td class="a"></td></tr>
+      <tr><td class="q">⑤ 신라 사람들이 쓰던 물건 가운데 오늘날에도 비슷하게 쓰는 물건 하나와, 오늘날의 무엇과 닮았는지</td><td class="a"></td></tr>
+    </table>
+  </div>
+
+  <div class="sec">
+    <h2><span class="n">5</span>다보탑과 석가탑, 닮은 점과 다른 점 <span class="hint">기억나는 대로 그리고, 특징을 비교해요</span></h2>
+    <div class="cmp">
+      <div class="draw"><div class="cap">다보탑</div><div class="sub">화려하고 복잡한 모양 · 돌사자</div></div>
+      <div class="draw"><div class="cap">석가탑 (불국사 삼층석탑)</div><div class="sub">단순하고 균형 잡힌 모양</div></div>
+    </div>
+    <div class="venn">
+      <div class="v"><div class="label">다보탑만의 특징</div><div class="lines"></div></div>
+      <div class="v"><div class="label">두 탑의 공통점</div><div class="lines"></div></div>
+      <div class="v"><div class="label">석가탑만의 특징</div><div class="lines"></div></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2><span class="n">6</span>문화재 해설사 되기 <span class="hint">3학년 동생에게 설명한다고 생각하고 써 보세요</span></h2>
+    <p class="lead">내가 고른 문화재: <span class="tag">다보탑</span> <span class="tag">석가탑</span> <span class="tag">성덕대왕신종</span> <span class="tag">신라 금관</span> <span class="tag">청운교·백운교</span> <span class="tag">내가 고른 유물 (<span class="fill" style="min-width:18mm;height:5mm"></span>)</span></p>
+    <div class="box"><div class="lines h6"></div></div>
+    <p class="lead" style="margin:1.5mm 0 0">✍️ 이렇게 시작해 보세요: "이 문화재는 ______ 시대에 만든 것인데, 가장 신기한 점은 ______이야. 왜냐하면 ______"</p>
+  </div>
+
+  <div class="foot"><span>문화재는 만지지 않고 눈으로 본 것처럼, 글도 정성껏</span><span>2 / 4</span></div>
+</section>
+
+<!-- ===================================================== 3쪽 -->
+<section class="page">
+  <div class="top">
+    <div class="t"><small>기억을 글로</small>이야기로 남기는 경주</div>
+    <div class="pg">3 / 4</div>
+  </div>
+
+  <div class="sec">
+    <h2><span class="n">7</span>오감으로 떠올리기 <span class="hint">단어나 짧은 구절로 적어도 좋아요</span></h2>
+    <div class="senses">
+      <div class="s"><div class="ic">👀</div><div class="label">본 것</div><div class="lines"></div></div>
+      <div class="s"><div class="ic">👂</div><div class="label">들은 소리</div><div class="lines"></div></div>
+      <div class="s"><div class="ic">👅</div><div class="label">맛본 것</div><div class="lines"></div></div>
+      <div class="s"><div class="ic">✋</div><div class="label">만지거나 탄 것</div><div class="lines"></div></div>
+      <div class="s"><div class="ic">💛</div><div class="label">느낀 마음</div><div class="lines"></div></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2><span class="n">8</span>여행 일기 또는 편지 <span class="hint">둘 중 하나를 골라 ✔ 표시하고 쓰세요</span></h2>
+    <p class="lead"><span class="chk"></span>여행 중 가장 기억에 남는 하루의 일기 &nbsp;&nbsp; <span class="chk"></span>고마운 사람(부모님·친구·선생님·기사님)에게 쓰는 편지 &nbsp;&nbsp; <span class="chk"></span>신라 사람에게 보내는 편지</p>
+    <div class="box">
+      <div style="display:flex;gap:3mm;align-items:baseline;margin-bottom:1mm"><span class="label" style="margin:0">제목</span><span class="fill" style="flex:1"></span></div>
+      <div class="lines h9"></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2><span class="n">9</span>내 마음속 사진 한 장 <span class="hint">가장 남기고 싶은 장면을 그리고 제목을 붙여요</span></h2>
+    <div class="photo">
+      <div class="frame"><div class="cap">📷 여기에 그 장면을 그려요 (우리 모둠 인증샷도 좋아요)</div></div>
+      <div>
+        <div class="label">사진 제목</div><div class="fill" style="width:100%;height:7mm;margin-bottom:2.5mm"></div>
+        <div class="label">이 장면을 고른 이유</div><div class="lines" style="--lh:7.5mm;height:calc(7.5mm*3)"></div>
+        <div class="label" style="margin-top:2mm">사진 속 사람들에게 한마디</div><div class="lines" style="--lh:7.5mm;height:calc(7.5mm*1)"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot"><span>글은 길이보다 마음이 담기는 게 중요해요</span><span>3 / 4</span></div>
+</section>
+
+<!-- ===================================================== 4쪽 -->
+<section class="page">
+  <div class="top">
+    <div class="t"><small>함께한 우리</small>모둠, 신라, 그리고 다음 여행</div>
+    <div class="pg">4 / 4</div>
+  </div>
+
+  <div class="sec">
+    <h2><span class="n">10</span>우리 모둠 되돌아보기 <span class="hint">솔직하게, 그러나 친절하게</span></h2>
+    <div class="grid2">
+      <div class="box"><div class="label">우리 모둠이 잘한 점 (예: 대표 폰 정하기, 길 찾기, 사진 찍기)</div><div class="lines" style="--lh:7.5mm;height:calc(7.5mm*3)"></div></div>
+      <div class="box"><div class="label">다음에는 이렇게 하고 싶어요</div><div class="lines" style="--lh:7.5mm;height:calc(7.5mm*3)"></div></div>
+    </div>
+    <div class="box" style="margin-top:2.5mm">
+      <div style="display:flex;gap:3mm;align-items:baseline"><span class="label" style="margin:0">칭찬하고 싶은 모둠 친구</span><span class="fill" style="width:30mm"></span><span class="label" style="margin:0">이유</span><span class="fill" style="flex:1"></span></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2><span class="n">11</span>옛날에도, 지금도 <span class="hint">박물관 미션을 이어서: 신라의 물건과 오늘날의 물건을 짝지어요</span></h2>
+    <table class="pair">
+      <tr><th style="width:36%">박물관에서 본 신라의 물건</th><th style="width:36%">오늘날의 비슷한 물건</th><th>달라진 점 · 같은 점</th></tr>
+      <tr><td></td><td></td><td></td></tr>
+      <tr><td></td><td></td><td></td></tr>
+      <tr><td></td><td></td><td></td></tr>
+    </table>
+    <div class="box" style="margin-top:2.5mm">
+      <div class="label">내가 천 년 전 신라에 살았다면 하루를 어떻게 보냈을까? (아침 · 낮 · 밤)</div>
+      <div class="lines" style="--lh:7.5mm;height:calc(7.5mm*5)"></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2><span class="n">12</span>다음 여행을 계획해요 <span class="hint">이번 여행에서 배운 것을 살려서</span></h2>
+    <div class="grid3">
+      <div class="box"><div class="label">가고 싶은 곳과 이유</div><div class="lines" style="--lh:7.5mm;height:calc(7.5mm*3)"></div></div>
+      <div class="box"><div class="label">꼭 챙길 준비물 3가지</div><div class="lines" style="--lh:7.5mm;height:calc(7.5mm*3)"></div></div>
+      <div class="box"><div class="label">그곳에서 해 보고 싶은 미션</div><div class="lines" style="--lh:7.5mm;height:calc(7.5mm*3)"></div></div>
+    </div>
+  </div>
+
+  <div class="sec" style="display:grid;grid-template-columns:1fr auto;gap:4mm;align-items:center">
+    <div class="box">
+      <div class="label">스스로 평가하기 &nbsp;<span style="font-weight:400">◎ 아주 잘함 &nbsp;○ 잘함 &nbsp;△ 노력 필요</span></div>
+      <div class="selfchk">
+        <span>여행에서 보고 들은 것을 자세히 떠올려 적었다.</span><span class="opts">◎ ○ △</span>
+        <span>문화재의 특징을 내 말로 설명할 수 있다.</span><span class="opts">◎ ○ △</span>
+        <span>모둠 친구들과 협동하며 미션을 해결했다.</span><span class="opts">◎ ○ △</span>
+        <span>이번 여행에서 고마운 마음을 표현했다.</span><span class="opts">◎ ○ △</span>
+      </div>
+    </div>
+    <div class="seal">선생님<br>확인</div>
+  </div>
+
+  <div class="foot"><span>완주 인증서를 받은 모둠은 이 활동지도 끝까지 해낼 수 있어요</span><span>4 / 4</span></div>
+</section>
+
+</body>
+</html>
